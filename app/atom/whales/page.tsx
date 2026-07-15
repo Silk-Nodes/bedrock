@@ -5,6 +5,7 @@
 // All real data; the over-time/first-seen caveats follow the backfill coverage.
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { StatCard } from "@/components/console/StatCard";
+import { ShareBars } from "@/components/share/ShareCharts";
 import { AddressLink } from "@/components/address/AddressLink";
 import { HoverTip } from "@/components/HoverTip";
 import { getWhaleIntel, type WhaleRow } from "@/lib/indexer";
@@ -162,7 +163,14 @@ export default async function WhalesPage() {
 
           {/* Account vintage histogram */}
           <div className="span-6">
-            <IntelCard title="Account vintage" meta={`when the top ${n} first appeared · earlier → newer`}>
+            <IntelCard title="Account vintage" meta={`when the top ${n} first appeared · earlier → newer`} shareFilename="bedrock-whale-vintage"
+              share={{
+                title: "How old are ATOM's biggest wallets? · Cosmos HUB",
+                subtitle: `Account vintage of the top ${n} holders · as of ${wi.day}`,
+                big: String(genesis), unit: "genesis-era wallets",
+                context: "Vintage is the auth account number, the order a wallet first appeared on the Hub. Lower is older.",
+                body: <ShareBars unit="wallets" rows={VBUCKETS.map((b, i) => ({ label: b.label, value: vintageCounts[i], color: b.color, display: String(vintageCounts[i]) }))} />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
                 {VBUCKETS.map((b, i) => {
                   const c = vintageCounts[i];
@@ -183,7 +191,14 @@ export default async function WhalesPage() {
 
           {/* Behavior mix */}
           <div className="span-6">
-            <IntelCard title="Behavior mix" meta={`how the top ${n} split by conduct`}>
+            <IntelCard title="Behavior mix" meta={`how the top ${n} split by conduct`} shareFilename="bedrock-whale-behavior"
+              share={{
+                title: "How ATOM's biggest wallets behave · Cosmos HUB",
+                subtitle: `Top ${n} holders split by conduct · as of ${wi.day}`,
+                big: String(diamond), unit: "fully staked",
+                context: `${sellers} have moved 25% or more of their balance onto exchanges, which is sell intent rather than a confirmed sale. Conduct comes from indexed staking and transfers, so it is accurate within the backfilled range.`,
+                body: <ShareBars unit="wallets" rows={behaviorMix.map((b) => ({ label: b.tag, value: b.count, color: b.color, display: String(b.count) }))} />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
                 {behaviorMix.map((b) => (
                   <div key={b.tag} style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -201,7 +216,14 @@ export default async function WhalesPage() {
 
           {/* Intel table */}
           <div className="span-12">
-            <IntelCard title="Top wallet breakdown" meta="click a wallet for its full timeline · vintage · posture · behavior">
+            <IntelCard title="Top wallet breakdown" meta="click a wallet for its full timeline · vintage · posture · behavior" shareFilename="bedrock-whale-breakdown"
+              share={{
+                title: "ATOM's top wallets · Cosmos HUB",
+                subtitle: `Top ${n} holders · as of ${wi.day}`,
+                big: compact(top100Atom), unit: "ATOM",
+                context: `Worth ${usd(top100Usd)} at today's price. ${genesis} genesis-era, ${diamond} fully staked, ${sellers} showing sell intent.`,
+                body: <ShareBars rows={rows.slice(0, 8).map((r) => ({ label: short(r.address), value: r.atom, note: `· ${behavior(r).tag}` }))} />,
+              }}>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
                   <thead>

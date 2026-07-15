@@ -5,6 +5,7 @@
 // dated snapshot of each original address (data/genesis-holders.json).
 
 import { MetricCard } from "@/components/console/MetricCard";
+import { ShareBars, ShareStack } from "@/components/share/ShareCharts";
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { AddressLink } from "@/components/address/AddressLink";
 import { HoverTip } from "@/components/HoverTip";
@@ -78,7 +79,18 @@ export default function GenesisHolders() {
 
         {/* Retention bar */}
         <div className="span-12">
-          <IntelCard title="Where the genesis ATOM sits today" meta="share of the 236.2M genesis supply">
+          <IntelCard title="Where the genesis ATOM sits today" meta={`share of the ${compact(genTotal)} genesis supply`} shareFilename="bedrock-genesis-retention"
+              share={{
+                title: "Where the genesis ATOM sits today · Cosmos HUB",
+                subtitle: `Share of the ${compact(genTotal)} ATOM genesis supply · as of ${genesis.snapshot}`,
+                big: `${((nowTotal / genTotal) * 100).toFixed(1)}%`, unit: "still in the original wallets",
+                context: "Balances are the current on-chain state of each 2019 address. ATOM moved to a new wallet reads here as an exit.",
+                body: <ShareStack rows={[{ label: "", segments: [
+                  { label: `staked · ${compact(stakedTotal)}`, value: stakedTotal, color: "var(--moss)" },
+                  { label: `liquid · ${compact(nowTotal - stakedTotal)}`, value: nowTotal - stakedTotal, color: "var(--hub)" },
+                  { label: `left the wallet · ${compact(genTotal - nowTotal)}`, value: genTotal - nowTotal, color: "var(--iron)" },
+                ] }]} />,
+              }}>
             {(() => {
               const heldStaked = holders.reduce((s, h) => s + h.st, 0);
               const heldLiquid = holders.reduce((s, h) => s + h.liq + h.unb, 0);
@@ -113,7 +125,14 @@ export default function GenesisHolders() {
 
         {/* Survivors leaderboard */}
         <div className="span-12">
-          <IntelCard title="OG survivors" meta="genesis wallets still holding, largest first">
+          <IntelCard title="OG survivors" meta="genesis wallets still holding, largest first" shareFilename="bedrock-genesis-survivors"
+              share={{
+                title: "Genesis ATOM survivors · Cosmos HUB",
+                subtitle: `Still holding from the original 2019 address · as of ${genesis.snapshot}`,
+                big: String(survivors.length), unit: `of the ${genesis.count}`,
+                context: `Holding ${compact(nowTotal)} ATOM · ${accumulated.length} hold more than they did at genesis · ${compact(stakedTotal)} ATOM bonded.`,
+                body: <ShareBars rows={topSurvivors.slice(0, 8).map((h) => ({ label: short(h.a), value: h.now, note: `· ${(h.gen > 0 ? (h.now / h.gen) * 100 : 0).toFixed(0)}% retained` }))} />,
+              }}>
             <div style={{ overflowX: "auto" }}>
               <table className="broadsheet mcols-4" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
@@ -155,7 +174,14 @@ export default function GenesisHolders() {
 
         {/* Biggest exits */}
         <div className="span-12">
-          <IntelCard title="Biggest genesis exits" meta="largest 2019 wallets now fully drained">
+          <IntelCard title="Biggest genesis exits" meta="largest 2019 wallets now fully drained" shareFilename="bedrock-genesis-exits"
+              share={{
+                title: "Biggest genesis exits · Cosmos HUB",
+                subtitle: `Largest 2019 wallets now fully drained · as of ${genesis.snapshot}`,
+                big: String(exited.length), unit: "wallets fully exited",
+                context: "Pre-Stargate history is still indexing, so an exit shows the original wallet is empty, not where the ATOM went.",
+                body: <ShareBars rows={topExits.slice(0, 8).map((h) => ({ label: short(h.a), value: h.gen, display: `${compact(h.gen)} → 0`, color: "var(--iron)" }))} />,
+              }}>
             <div style={{ overflowX: "auto" }}>
               <table className="broadsheet mcols-3" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
