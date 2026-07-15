@@ -5,6 +5,7 @@
 // gridlines, ending in a glowing endpoint dot (the "live" marker).
 
 import { useState, useMemo, useId } from "react";
+import { matchGapOverride, type GapOverride } from "./gaps";
 
 const W = 1180;
 const PAD = { top: 24, right: 24, bottom: 36, left: 72 };
@@ -15,6 +16,8 @@ function fmtCompact(n: number): string {
   if (abs >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
   return n.toString();
 }
+
+export type { GapOverride };
 
 export type Series = {
   label: string;
@@ -36,30 +39,6 @@ export type Series = {
 // stay connected and only structural holes split the line.
 const GAP_FACTOR = 4;
 
-/** A known window whose absence has a specific cause, matched against a hole in
- *  the data by date. Plain data, not a function: these charts are Client
- *  Components and RSC cannot pass a function across the boundary. */
-export type GapOverride = { from: string; to: string; label: string };
-
-/**
- * Names a hole when a known override covers it, else null.
- *
- * A data hole runs from the last row BEFORE it to the first row AFTER it, so it
- * is always at least as wide as the real window inside it. Matched with a day of
- * tolerance at each edge rather than by equality, because the bounding rows are
- * whatever the series happened to have, not the bounding blocks.
- */
-export function matchGapOverride(from: string, to: string, overrides?: GapOverride[]): string | null {
-  if (!overrides?.length) return null;
-  const DAY = 86_400_000;
-  const a = Date.parse(from);
-  const b = Date.parse(to);
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-  for (const o of overrides) {
-    if (a <= Date.parse(o.from) + DAY && b >= Date.parse(o.to) - DAY) return o.label;
-  }
-  return null;
-}
 
 export type TimeWindow = { id: string; label: string; takeLast: number };
 
