@@ -22,6 +22,7 @@ import { getExchangeFlow, getExchangeNetFlow, windowLabel } from "@/lib/indexer"
 import { getExchangeCustody } from "@/lib/exchanges";
 import { getLiveChain } from "@/lib/chain";
 import { ShareBars, ShareLineChart } from "@/components/share/ShareCharts";
+import { CHAIN_GAPS } from "@/data/methodology";
 import { seo } from "@/lib/seo";
 
 export const revalidate = 1800;
@@ -451,13 +452,23 @@ export default async function Exchanges({ searchParams }: { searchParams: Promis
   const dayMs = 86_400_000;
   const spanDays = Math.round((Date.parse(lastDay) - Date.parse(firstDay)) / dayMs) + 1;
   const indexedDays = binance.length;
-  const complete = indexedDays >= spanDays - 1;
+  // Days inside this span that the chain never produced, so they can never be
+  // indexed and must not sit in the denominator: counting them made "backfill
+  // in progress" promise 240 days that are not coming.
+  const chainGapDays = CHAIN_GAPS.reduce((acc, g) => {
+    const a = Math.max(Date.parse(g.from), Date.parse(firstDay));
+    const b = Math.min(Date.parse(g.to), Date.parse(lastDay));
+    return acc + Math.max(0, Math.round((b - a) / dayMs));
+  }, 0);
+  const indexableDays = spanDays - chainGapDays;
+
   // Exact counts, not fmtCompact: it is built for ATOM amounts and rounds 2,602
   // up to "3k", which is a claim of its own in the one line whose whole job is
   // to be precise about how much of the window is real.
-  const coverage = complete
+  const complete2 = indexedDays >= indexableDays - 1;
+  const coverage = complete2
     ? `${firstDay} → ${lastDay}`
-    : `${firstDay} → ${lastDay} · ${indexedDays.toLocaleString("en-US")} of ${spanDays.toLocaleString("en-US")} days indexed, backfill in progress`;
+    : `${firstDay} → ${lastDay} · ${indexedDays.toLocaleString("en-US")} of ${indexableDays.toLocaleString("en-US")} indexable days, backfill in progress`;
 
   const series: Series[] = [
     { label: "Deposits (onto Binance)", color: "var(--iron)", points: binance.map((r) => ({ date: r.day, value: Math.round(r.deposit_atom) })) },
@@ -467,6 +478,12 @@ export default async function Exchanges({ searchParams }: { searchParams: Promis
   // The share card takes the last N ROWS, and rows are days-with-data, not
   // calendar days. While the backfill is open those 365 rows reach back years,
   // so the card cannot call itself "the past year": it names the window it got.
+  // Two holes sit in this series and they are NOT the same fact. 2023-03 →
+  // 2026-06 is the cosmoshub-4 backfill, still climbing, and it closes on its
+  // own. 2019-12 → 2020-08 is the cosmoshub-2 → cosmoshub-3 boundary, where the
+  // chain produced no blocks at all, so nothing will ever fill it. Labelling
+  // both "backfill in progress" promised readers data that is never coming.
+  // CHAIN_GAPS names the ones that never resolve; everything else is unread.
   const SHARE_ROWS = 365;
   const shareRows = binance.slice(-SHARE_ROWS);
   const shareWindow = `${shareRows[0].day} → ${shareRows[shareRows.length - 1].day}`;
@@ -511,19 +528,19 @@ export default async function Exchanges({ searchParams }: { searchParams: Promis
           <div className="span-12">
             <ChartCard
               title="Daily deposits vs withdrawals · Binance"
-              meta={complete
+              meta={complete2
                 ? "verified cluster · 2021 wallets + current hot wallet, chain-of-custody"
-                : "verified cluster · chain-of-custody · gaps are un-indexed, not zero flow"}
+                : "verified cluster · chain-of-custody · each gap is labelled with its cause"}
               accentColor="var(--iron)"
               shareFilename="bedrock-binance-flows"
               share={{
                 title: "Binance ATOM flows · Cosmos HUB",
                 subtitle: `Daily deposits vs withdrawals · ${shareWindow} · ${shareRows.length.toLocaleString("en-US")} indexed days, from Bedrock's own indexer`,
                 context: "Label-driven flows: only addresses verified by chain-of-custody and documented sources classify as exchange flow.",
-                body: <ShareLineChart series={series} unit="ATOM/day" takeLast={SHARE_ROWS} height={240} gapLabel="BACKFILL IN PROGRESS" />,
+                body: <ShareLineChart series={series} unit="ATOM/day" takeLast={SHARE_ROWS} height={240} gapLabel="BACKFILL IN PROGRESS" gapOverrides={CHAIN_GAPS} />,
               }}
             >
-              <LineChart series={series} yLabel="ATOM / DAY" height={300} gapLabel="BACKFILL IN PROGRESS" />
+              <LineChart series={series} yLabel="ATOM / DAY" height={300} gapLabel="BACKFILL IN PROGRESS" gapOverrides={CHAIN_GAPS} />
             </ChartCard>
           </div>
 

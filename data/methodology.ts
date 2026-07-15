@@ -154,6 +154,29 @@ export const COVERAGE = {
   labels_inferred: 45,
 };
 
+// Windows in which the Cosmos Hub produced NO BLOCKS.
+//
+// These are NOT backfill gaps and must never be labelled as one: nothing will
+// ever fill them, because the blocks do not exist. A chart that says "backfill
+// in progress" over one of these promises data that is never coming.
+//
+// Verified against the chain archives, two consecutive heights on either side
+// of the boundary:
+//
+//   height 2,902,002   chain_id cosmoshub-2   2019-12-11T15:11:49
+//   height 2,902,003   chain_id cosmoshub-3   2020-08-07T11:53:32
+//
+// Consecutive heights, 240 days apart. Corroborated by the index itself: no
+// transfer_events and no staking_events exist anywhere in that window, and
+// cosmoshub-2/3 have both finished backfilling (their cursors sit at their
+// ceilings and stopped advancing).
+// Matched against a chart's holes by LineChart/ShareLineChart (see
+// matchGapOverride), which is where the date-tolerance logic lives.
+export const CHAIN_GAPS: { from: string; to: string; label: string }[] = [
+  { from: "2019-12-11", to: "2020-08-07", label: "NO BLOCKS · COSMOSHUB-2 → 3" },
+];
+
+
 // share of chain history the backfill has covered, genesis -> tip
 export const historyPct = () =>
   ((COVERAGE.history_cursor - COVERAGE.genesis_height) /

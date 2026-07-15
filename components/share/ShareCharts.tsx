@@ -3,7 +3,7 @@
 // RelPerfShareChart pattern. Each takes the same data the live chart on the
 // page already has in scope, so wiring a card is one `body:` prop.
 
-import type { Series } from "../charts/LineChart";
+import { matchGapOverride, type Series, type GapOverride } from "../charts/LineChart";
 
 export function fmtShare(n: number): string {
   const abs = Math.abs(n);
@@ -25,6 +25,7 @@ export function ShareLineChart({
   suffix = "",
   takeLast,
   gapLabel = "NO DATA",
+  gapOverrides,
 }: {
   series: Series[];
   height?: number;
@@ -32,8 +33,10 @@ export function ShareLineChart({
   prefix?: string;   // e.g. "$"
   suffix?: string;   // e.g. "%"
   takeLast?: number;
-  /** Shown inside a gap band; say WHY the data is missing when you know. */
+  /** Shown inside a gap band when no override matches. */
   gapLabel?: string;
+  /** Holes whose cause is known and specific, matched by date. See LineChart. */
+  gapOverrides?: GapOverride[];
 }) {
   const H = height;
   const PAD = { top: 16, right: 20, bottom: 30, left: 64 };
@@ -65,11 +68,15 @@ export function ShareLineChart({
   const y = (v: number) => PAD.top + plotH - ((v - yMin) / yRange) * plotH;
 
   const gaps = timeOk
-    ? ts.slice(1).flatMap((t, i) =>
-        t - ts[i] > gapMs
-          ? [{ x0: xAtTime(ts[i]), x1: xAtTime(t), days: Math.round((t - ts[i]) / 86_400_000) }]
-          : [],
-      )
+    ? ts.slice(1).flatMap((t, i) => {
+        if (t - ts[i] <= gapMs) return [];
+        return [{
+          x0: xAtTime(ts[i]),
+          x1: xAtTime(t),
+          days: Math.round((t - ts[i]) / 86_400_000),
+          label: matchGapOverride(clipped[0].points[i].date, clipped[0].points[i + 1].date, gapOverrides) ?? gapLabel,
+        }];
+      })
     : [];
   const ticks = [yMax, (yMax + yMin) / 2, yMin];
   const first = clipped[0].points[0]?.date ?? "";
@@ -127,7 +134,7 @@ export function ShareLineChart({
                 fill="var(--ink-40)"
                 letterSpacing="1.4"
               >
-                {gapLabel} · {g.days.toLocaleString("en-US")} DAYS
+                {g.label} · {g.days.toLocaleString("en-US")} DAYS
               </text>
             )}
           </g>
