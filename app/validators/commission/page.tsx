@@ -1,6 +1,7 @@
 // /validators/commission - Commission distribution, live from chain.
 
 import { MetricCard } from "@/components/console/MetricCard";
+import { ShareBars } from "@/components/share/ShareCharts";
 import {
   ConsolePage, ConsoleModule, IntelCard,
 } from "@/components/console/Console";
@@ -96,7 +97,14 @@ export default async function ValidatorsCommission() {
         </div>
 
         <div className="span-6">
-          <IntelCard title="Commission distribution" meta="validators per band">
+          <IntelCard title="Commission distribution" meta="validators per band" shareFilename="bedrock-commission-distribution"
+            share={{
+              title: "Validator commission · Cosmos HUB",
+              subtitle: "Validators in each commission band",
+              big: `${median.toFixed(1)}%`, unit: "median commission",
+              context: `Mean ${avg.toFixed(1)}% · stake-weighted ${stakeWeightedAvg.toFixed(1)}%, which is what delegators actually pay · range ${min.toFixed(0)} to ${max.toFixed(0)}%. Self-declared on-chain.`,
+              body: <ShareBars unit="validators" rows={banded.map((b) => ({ label: b.label, value: b.count, display: String(b.count) }))} />,
+            }}>
             {banded.map((b, i) => (
               <div key={b.label} style={{
                 display: "grid", gridTemplateColumns: "90px 1fr 50px", alignItems: "center", gap: 12,
@@ -112,7 +120,14 @@ export default async function ValidatorsCommission() {
           </IntelCard>
         </div>
         <div className="span-6">
-          <IntelCard title="By voting power" meta="stake in each band" accent>
+          <IntelCard title="By voting power" meta="stake in each band" accent shareFilename="bedrock-commission-by-power"
+            share={{
+              title: "Where the stake pays commission · Cosmos HUB",
+              subtitle: "Share of voting power in each commission band",
+              big: `${stakeWeightedAvg.toFixed(1)}%`, unit: "stake-weighted commission",
+              context: "The fee delegators actually pay, weighted by where the stake sits, rather than the simple mean across the set.",
+              body: <ShareBars unit="" rows={banded.map((b) => ({ label: b.label, value: (b.vp / totalVp) * 100, display: `${((b.vp / totalVp) * 100).toFixed(0)}%`, color: "var(--sand)" }))} />,
+            }}>
             {banded.map((b, i) => {
               const pct = (b.vp / totalVp) * 100;
               return (

@@ -2,6 +2,7 @@
 
 import { Fragment } from "react";
 import { MetricCard } from "@/components/console/MetricCard";
+import { ShareBars } from "@/components/share/ShareCharts";
 import {
   ConsolePage, ConsoleModule, IntelCard,
 } from "@/components/console/Console";
@@ -97,7 +98,14 @@ export default async function ValidatorsSet() {
           </div>
 
           <div className="span-12">
-            <IntelCard title="The set" meta={`${rows.length} bonded validators, live`}>
+            <IntelCard title="The set" meta={`${rows.length} bonded validators, live`} shareFilename="bedrock-validator-set"
+              share={liveOn ? {
+                title: "The Cosmos Hub validator set",
+                subtitle: `${rows.length} bonded validators, live`,
+                big: fmtCompact(live.total_bonded), unit: "ATOM bonded",
+                context: `Median stake ${fmtCompact(medianVp)} against ${fmtCompact(vpDesc[0] ?? 0)} at the top${live.avg_uptime_pct !== null ? ` · average uptime ${live.avg_uptime_pct}%` : ""}.`,
+                body: <ShareBars rows={rows.slice(0, 8).map((r) => ({ label: r.moniker, value: r.voting_power, note: r.commission != null ? `· ${(r.commission * 100).toFixed(0)}% fee` : undefined }))} />,
+              } : undefined}>
               <div style={{ maxHeight: 560, overflowY: "auto" }}>
               <table className="broadsheet mcols-4">
                 <thead>

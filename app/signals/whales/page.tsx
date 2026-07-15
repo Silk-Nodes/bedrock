@@ -10,6 +10,7 @@ import { ValidatorLink } from "@/components/validator/ValidatorLink";
 import { ValidatorAvatar } from "@/components/console/ValidatorAvatar";
 import { Soon } from "@/components/console/Soon";
 import { WhaleWindow } from "@/components/signals/WhaleWindow";
+import { ShareBars } from "@/components/share/ShareCharts";
 import { getFlowFeed, getStakingRecent, getSellPressure, windowLabel } from "@/lib/indexer";
 import { getLiveValidators, getValidatorLogoMap } from "@/lib/validators";
 import { seo } from "@/lib/seo";
@@ -59,7 +60,19 @@ type StakeRow = { delegator: string; validator: string; valName: string; logo: s
 
 function StakeTable({ title, rows, accent, verb }: { title: string; rows: StakeRow[]; accent: string; verb: string }) {
   return (
-    <IntelCard title={title} meta="largest, recent">
+    <IntelCard
+      title={title}
+      meta="largest, recent"
+      shareFilename={`bedrock-${verb.toLowerCase().replace(/\s+/g, "-")}`}
+      share={rows.length ? {
+        title: `${title} · Cosmos HUB`,
+        subtitle: `Largest recent ${verb.toLowerCase()} moves`,
+        big: fmtCompact(rows.reduce((s, r) => s + r.atom, 0)),
+        unit: "ATOM",
+        context: "Largest recent staking moves, live from the Bedrock indexer.",
+        body: <ShareBars rows={rows.slice(0, 8).map((r) => ({ label: shortAddr(r.delegator), value: r.atom, color: accent, note: `· ${r.valName}` }))} />,
+      } : undefined}
+    >
       <table className="broadsheet mcols-3">
         <thead>
           <tr>
@@ -168,7 +181,15 @@ export default async function SignalsWhales({ searchParams }: { searchParams: Pr
           {/* Biggest exchange depositors (sell-intent), from the sell-pressure rollup */}
           {sp.top_senders.length > 0 && (
             <div className="span-6">
-              <IntelCard title="Biggest exchange depositors" meta={`sell-intent · last ${spLabel}`}>
+              <IntelCard title="Biggest exchange depositors" meta={`sell-intent · last ${spLabel}`} shareFilename="bedrock-whale-depositors"
+                share={{
+                  title: "Biggest ATOM exchange depositors · Cosmos HUB",
+                  subtitle: `Sell intent · last ${spLabel}`,
+                  big: fmtCompact(sp.top_senders.slice(0, WHALE_ROWS).reduce((acc, x) => acc + x.atom, 0)),
+                  unit: `ATOM across the top ${Math.min(WHALE_ROWS, sp.top_senders.length)}`,
+                  context: "Depositing to an exchange is the act before a sale, so this is sell intent, not a confirmed sale.",
+                  body: <ShareBars rows={sp.top_senders.slice(0, 8).map((x) => ({ label: shortAddr(x.addr), value: x.atom, color: "var(--iron)", note: `· ${x.count} deposits` }))} />,
+                }}>
                 <table className="broadsheet mcols-3">
                   <thead>
                     <tr><th style={{ width: 28 }}>#</th><th>Wallet</th><th style={{ textAlign: "right" }} className="mhide3">Deposits</th><th style={{ textAlign: "right" }}>ATOM</th></tr>
@@ -191,7 +212,14 @@ export default async function SignalsWhales({ searchParams }: { searchParams: Pr
           {/* Largest transfers */}
           {top.length > 0 && (
             <div className="span-6">
-              <IntelCard title="Largest transfers" meta={`≥ 10k ATOM · last ${feedLabel}`}>
+              <IntelCard title="Largest transfers" meta={`≥ 10k ATOM · last ${feedLabel}`} shareFilename="bedrock-whale-transfers"
+                share={{
+                  title: "Largest ATOM transfers · Cosmos HUB",
+                  subtitle: `10k ATOM or more · last ${feedLabel}`,
+                  big: String(flows.length), unit: "whale moves",
+                  context: "Every transfer of 10k ATOM or more the indexer captured in the window it actually covers.",
+                  body: <ShareBars rows={top.slice(0, 8).map((f) => ({ label: shortAddr(f.from), value: f.amount_atom, note: `· → ${shortAddr(f.to)}` }))} />,
+                }}>
                 <table className="broadsheet mcols-3">
                   <thead>
                     <tr><th style={{ width: 44 }}>Ago</th><th>From</th><th>To</th><th style={{ textAlign: "right" }}>ATOM</th></tr>

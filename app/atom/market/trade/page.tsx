@@ -6,7 +6,7 @@
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { MetricCard } from "@/components/console/MetricCard";
 import { getAtomMarkets, type AtomMarketRow } from "@/lib/price";
-import { ShareStack } from "@/components/share/ShareCharts";
+import { ShareStack, ShareBars } from "@/components/share/ShareCharts";
 import { seo } from "@/lib/seo";
 
 export const revalidate = 300;
@@ -89,14 +89,28 @@ export default async function AtomTrade() {
 
           {/* CEX markets */}
           <div className="span-12">
-            <IntelCard title="Centralized exchanges" meta={`top ${cex.length} by volume`}>
+            <IntelCard title="Centralized exchanges" meta={`top ${cex.length} by volume`} shareFilename="bedrock-atom-cex"
+              share={{
+                title: "Where ATOM trades · centralized exchanges",
+                subtitle: `Top ${cex.length} CEX venues by 24h volume`,
+                big: fmtUsd(m.cexVolUsd), unit: "24h CEX volume",
+                context: `${cexShare.toFixed(0)}% of all tracked ATOM volume. Ranked by exchange-reported 24h volume, which is a liquidity proxy, not order-book depth.`,
+                body: <ShareBars unit="" rows={cex.slice(0, 8).map((r) => ({ label: `${r.exchange} · ${r.pair}`, value: r.volumeUsd, display: fmtUsd(r.volumeUsd) }))} />,
+              }}>
               {cex.length ? <MarketTable rows={cex} /> : <div style={{ fontSize: 13, color: "var(--ink-50)" }}>Market data is unavailable right now.</div>}
             </IntelCard>
           </div>
 
           {/* DEX markets */}
           <div className="span-12">
-            <IntelCard title="Decentralized exchanges" meta="on-chain · Osmosis & others">
+            <IntelCard title="Decentralized exchanges" meta="on-chain · Osmosis & others" shareFilename="bedrock-atom-dex"
+              share={{
+                title: "Where ATOM trades · on-chain",
+                subtitle: `Top ${dex.length} DEX venues by 24h volume`,
+                big: fmtUsd(m.dexVolUsd), unit: "24h DEX volume",
+                context: `${dexShare.toFixed(0)}% of all tracked ATOM volume, led by Osmosis. Reported volume, not order-book depth.`,
+                body: <ShareBars unit="" rows={dex.slice(0, 8).map((r) => ({ label: `${r.exchange} · ${r.pair}`, value: r.volumeUsd, display: fmtUsd(r.volumeUsd) }))} />,
+              }}>
               {dex.length ? <MarketTable rows={dex} /> : (
                 <div style={{ fontSize: 13, color: "var(--ink-50)", lineHeight: 1.6 }}>No on-chain DEX markets are being reported right now. ATOM trades on Osmosis (the main Cosmos DEX); it reappears here when the market feed lists it.</div>
               )}

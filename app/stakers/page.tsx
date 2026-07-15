@@ -4,6 +4,7 @@
 // is gone; its insight now lives in the data cards and the validator bar list.
 
 import { MetricCardLive } from "@/components/console/MetricCardLive";
+import { ShareBars } from "@/components/share/ShareCharts";
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { getLiveChain } from "@/lib/chain";
 import { getLiveValidators } from "@/lib/validators";
@@ -54,7 +55,14 @@ export default async function Stakers() {
           </div>
 
           <div className="span-12">
-            <IntelCard title="Where stake sits" meta={`top 10 hold ${top10pct.toFixed(0)}% of voting power`}>
+            <IntelCard title="Where stake sits" meta={`top 10 hold ${top10pct.toFixed(0)}% of voting power`} shareFilename="bedrock-where-stake-sits"
+              share={{
+                title: "Where ATOM stake sits · Cosmos HUB",
+                subtitle: `Top ${top.length} validators by voting power`,
+                big: `${top10pct.toFixed(0)}%`, unit: `held by the top ${top.length}`,
+                context: `Of ${fmtCompact(chain.bonded)} ATOM bonded, ${chain.bonded_ratio_pct.toFixed(1)}% of supply. Live on-chain.`,
+                body: <ShareBars rows={top.map((v) => ({ label: `${v.rank}. ${v.moniker}`, value: v.voting_power, note: `· ${v.voting_power_pct.toFixed(1)}%` }))} />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
                 {top.map((v) => (
                   <div key={v.rank}>

@@ -10,7 +10,7 @@ import { Soon } from "@/components/console/Soon";
 import { AddressLink } from "@/components/address/AddressLink";
 import { getRewardClaims, getRewardBehavior, spanLabel, type RewardTierBehavior } from "@/lib/indexer";
 import { TipCard } from "@/components/charts/TipCard";
-import { ShareStack } from "@/components/share/ShareCharts";
+import { ShareStack, ShareBars } from "@/components/share/ShareCharts";
 import { seo } from "@/lib/seo";
 
 export const revalidate = 600;
@@ -167,7 +167,14 @@ export default async function StakersRewards() {
           {/* Top claimants (existing view, kept) */}
           {claims.live && claims.top.length > 0 && (
             <div className="span-12">
-              <IntelCard title="Top claimants" meta={`last ${spanLabel(claims.window_start, claims.window_end)} · ${fmtCompact(top12Atom)} ATOM across the top ${claims.top.length}`}>
+              <IntelCard title="Top claimants" meta={`last ${spanLabel(claims.window_start, claims.window_end)} · ${fmtCompact(top12Atom)} ATOM across the top ${claims.top.length}`} shareFilename="bedrock-top-claimants"
+                share={{
+                  title: "Top ATOM reward claimants · Cosmos HUB",
+                  subtitle: `Last ${spanLabel(claims.window_start, claims.window_end)}`,
+                  big: fmtCompact(top12Atom), unit: `ATOM across the top ${claims.top.length}`,
+                  context: "Reward withdrawals indexed per wallet over the window the indexer actually covers.",
+                  body: <ShareBars rows={claims.top.slice(0, 8).map((c) => ({ label: shortAddr(c.address), value: c.total_atom, color: "var(--moss)", note: `· ${c.count} claims` }))} />,
+                }}>
                 <table className="broadsheet">
                   <thead><tr><th>Wallet</th><th style={{ textAlign: "right" }}>Claimed</th><th style={{ textAlign: "right" }}>Claims</th></tr></thead>
                   <tbody>
