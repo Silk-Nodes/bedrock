@@ -11,6 +11,7 @@ import { getProposalDetail } from "@/lib/gov";
 import { getProposalVotes, type VoteOption } from "@/lib/govVotes";
 import { getProposalVelocity } from "@/lib/indexer";
 import { Sparkline } from "@/components/charts/Sparkline";
+import { ShareBars, ShareStack, ShareLineChart } from "@/components/share/ShareCharts";
 
 export const dynamic = "force-dynamic";
 
@@ -160,7 +161,18 @@ export default async function GovProposalPage({ params }: { params: Promise<{ id
 
           {/* Outcome checks */}
           <div className="span-4">
-            <IntelCard title={isVoting ? "Will it pass?" : "Outcome"} meta="vote requirements">
+            <IntelCard title={isVoting ? "Will it pass?" : "Outcome"} meta="vote requirements" shareFilename={`bedrock-gov-${p.id}-outcome`}
+              share={{
+                title: `Prop #${p.id} · ${isVoting ? "will it pass?" : "outcome"}`,
+                subtitle: p.title,
+                big: `${p.yesOfDecidingPct}%`, unit: "yes of deciding",
+                context: `Turnout ${p.turnoutPct}% against a ${p.quorumPct}% quorum · veto ${p.vetoOfTotalPct}% against a ${p.vetoThresholdPct}% limit · ${p.passing ? "on track to pass" : "on track to fail"}.`,
+                body: <ShareBars unit="" rows={[
+                  { label: "Turnout", value: p.turnoutPct, display: `${p.turnoutPct}%` },
+                  { label: "Yes of deciding", value: p.yesOfDecidingPct, display: `${p.yesOfDecidingPct}%`, color: "var(--moss)" },
+                  { label: "Veto", value: p.vetoOfTotalPct, display: `${p.vetoOfTotalPct}%`, color: "#8B3A2F" },
+                ]} />,
+              }}>
               <Check ok={p.quorumMet} label="Quorum reached" detail={`${p.turnoutPct}% turnout vs ${p.quorumPct}% needed`} />
               <Check ok={p.yesOfDecidingPct > p.thresholdPct} label="Majority Yes" detail={`${p.yesOfDecidingPct}% yes vs ${p.thresholdPct}% needed`} />
               <Check ok={p.vetoOfTotalPct < p.vetoThresholdPct} label="Not vetoed" detail={`${p.vetoOfTotalPct}% veto vs ${p.vetoThresholdPct}% limit`} />
@@ -172,7 +184,14 @@ export default async function GovProposalPage({ params }: { params: Promise<{ id
 
           {/* Vote tally */}
           <div className="span-12">
-            <IntelCard title="Vote tally" meta={`${c(p.totalVotes_atom)} ATOM voted · ${p.turnoutPct}% of bonded`}>
+            <IntelCard title="Vote tally" meta={`${c(p.totalVotes_atom)} ATOM voted · ${p.turnoutPct}% of bonded`} shareFilename={`bedrock-gov-${p.id}-tally`}
+              share={{
+                title: `Prop #${p.id} vote tally · Cosmos HUB`,
+                subtitle: p.title,
+                big: c(p.totalVotes_atom), unit: `ATOM voted · ${p.turnoutPct}% of bonded`,
+                context: "On-chain tally, weighted by bonded ATOM.",
+                body: <ShareStack rows={[{ label: "", segments: SEGMENTS.map((seg) => ({ label: `${seg.label} ${p.tally[seg.key]}%`, value: p.tally[seg.key], color: seg.color })) }]} />,
+              }}>
               <div className="gbar" style={{ display: "flex", width: "100%", height: 24, overflow: "hidden" }}>
                 {SEGMENTS.map((s) => {
                   const pct = p.tally[s.key];
@@ -219,7 +238,14 @@ export default async function GovProposalPage({ params }: { params: Promise<{ id
           {/* Vote flow: cumulative votes the indexer has recorded (forward-only) */}
           {velocity.live && velocity.cumulative.length >= 2 && (
             <div className="span-12">
-              <IntelCard title="Vote flow" meta="recorded live by the Bedrock indexer">
+              <IntelCard title="Vote flow" meta="recorded live by the Bedrock indexer" shareFilename={`bedrock-gov-${p.id}-vote-flow`}
+                share={{
+                  title: `Prop #${p.id} vote flow · Cosmos HUB`,
+                  subtitle: `Cumulative votes · ${fmtWindow(velocity.first_ts)} → ${fmtWindow(velocity.last_ts)}`,
+                  big: velocity.recorded.toLocaleString("en-US"), unit: "votes recorded",
+                  context: `Yes ${velocity.yes.toLocaleString("en-US")} · against ${velocity.against.toLocaleString("en-US")}. Forward-only: this covers the window the indexer tracked, not necessarily the whole voting period.`,
+                  body: <ShareLineChart unit="votes" height={230} series={[{ label: "Cumulative votes", color: "var(--hub)", points: velocity.cumulative.map((v, i) => ({ date: String(i), value: v })) }]} />,
+                }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 28, flexWrap: "wrap" }}>
                   <div style={{ flex: "1 1 300px", minWidth: 220 }}>
                     <Sparkline values={velocity.cumulative} width={340} height={60} stroke="var(--hub)" dot="var(--hub-2)" />
@@ -250,7 +276,14 @@ export default async function GovProposalPage({ params }: { params: Promise<{ id
           {/* Validator votes: how the bonded set voted, weighted by power */}
           <div className="span-12">
             {votes.available ? (
-              <IntelCard title="Validator votes" meta={`${votes.validatorsVoted} of ${votes.validators.length} validators · ${votes.totalVoters.toLocaleString("en-US")} total voters`}>
+              <IntelCard title="Validator votes" meta={`${votes.validatorsVoted} of ${votes.validators.length} validators · ${votes.totalVoters.toLocaleString("en-US")} total voters`} shareFilename={`bedrock-gov-${p.id}-validator-votes`}
+                share={{
+                  title: `Prop #${p.id} · how validators voted`,
+                  subtitle: `${votes.validatorsVoted} of ${votes.validators.length} validators · ${votes.powerVotedPct}% of voting power`,
+                  big: `${votes.powerVotedPct}%`, unit: "of voting power voted",
+                  context: `${votes.totalVoters.toLocaleString("en-US")} addresses voted in total. Per-voter data is pruned on public nodes for older proposals.`,
+                  body: <ShareBars unit="" rows={votes.validators.slice(0, 8).map((v) => ({ label: v.moniker, value: v.powerPct, display: `${v.powerPct}%`, color: VOTE_META[v.option]?.color, note: `· ${v.option}` }))} />,
+                }}>
                 {/* Summary strip */}
                 <div style={{ display: "flex", gap: 32, flexWrap: "wrap", marginBottom: 16 }}>
                   <div><div className="eyebrow" style={{ marginBottom: 3 }}>Addresses voted</div><div className="data" style={{ fontSize: 18, fontWeight: 700, color: "var(--ink)" }}>{votes.totalVoters.toLocaleString("en-US")}</div></div>

@@ -12,6 +12,7 @@ import { Soon } from "@/components/console/Soon";
 import { LiveExchangeFeed } from "@/components/exchanges/LiveExchangeFeed";
 import { getExchangeCustody } from "@/lib/exchanges";
 import { getLabels, getExchangeNetFlow, windowLabel } from "@/lib/indexer";
+import { ShareBars } from "@/components/share/ShareCharts";
 import { seo } from "@/lib/seo";
 
 export const revalidate = 600;
@@ -120,7 +121,14 @@ export default async function PerExchangePage({ searchParams }: { searchParams: 
 
           {vals.length > 0 && (
             <div className="span-6">
-              <IntelCard title="Validators" meta={`${ex} runs these`}>
+              <IntelCard title="Validators" meta={`${ex} runs these`} shareFilename="bedrock-exchange-validators"
+                share={{
+                  title: `${ex} validators · Cosmos HUB`,
+                  subtitle: `ATOM bonded to ${ex}'s own validator${vals.length === 1 ? "" : "s"}`,
+                  big: fmt(vals.reduce((acc, v) => acc + v.bonded_atom, 0)), unit: "ATOM bonded",
+                  context: "Operator addresses are the exchange's self-declared on-chain validator identity, with live bonded totals.",
+                  body: <ShareBars rows={[...vals].sort((a, b) => b.bonded_atom - a.bonded_atom).slice(0, 8).map((v) => ({ label: v.moniker, value: v.bonded_atom }))} />,
+                }}>
                 <table className="broadsheet">
                   <thead><tr><th>Moniker</th><th style={{ textAlign: "right" }}>Bonded ATOM</th></tr></thead>
                   <tbody>
@@ -135,7 +143,14 @@ export default async function PerExchangePage({ searchParams }: { searchParams: 
 
           {addrs.length > 0 && (
             <div className="span-6">
-              <IntelCard title="Verified addresses" meta="role · confidence">
+              <IntelCard title="Verified addresses" meta="role · confidence" shareFilename="bedrock-exchange-addresses"
+                share={{
+                  title: `${ex} verified addresses · Cosmos HUB`,
+                  subtitle: "Role and attribution confidence",
+                  big: String(addrs.length), unit: `address${addrs.length === 1 ? "" : "es"}`,
+                  context: "Bedrock's own attribution, from chain-of-custody and first-party disclosure. Anything unproven stays unlabeled rather than guessed.",
+                  body: <ShareBars unit="" rows={[...new Set(addrs.map((a) => a.category))].map((cat) => ({ label: CAT_LABEL[cat] ?? cat, value: addrs.filter((a) => a.category === cat).length, display: String(addrs.filter((a) => a.category === cat).length) }))} />,
+                }}>
                 <table className="broadsheet">
                   <thead><tr><th>Address</th><th>Role</th><th style={{ width: 70 }}>Conf.</th></tr></thead>
                   <tbody>

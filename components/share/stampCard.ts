@@ -11,6 +11,19 @@
 import { getShareBlock } from "@/lib/indexer";
 import type { SocialCardProps } from "./SocialCard";
 
+/**
+ * Pass as a card's `blockHeight` when the card is built from a dated snapshot
+ * rather than a live chain read (e.g. /atom/genesis, which renders a static
+ * JSON file). A block stamp there would claim a freshness the data does not
+ * have, which is the same lie as labelling a 6-week chart "16 weeks". Cards
+ * marked this way skip the status read entirely and fall back to stamping the
+ * export date, while their own subtitle carries the data's real vintage.
+ *
+ * Skipping the read also keeps the page off the status cache's 600s clock, so a
+ * snapshot page can keep whatever revalidate its author chose.
+ */
+export const NOT_LIVE = 0;
+
 // Overloaded so a caller that already knows it has a card (Panel, inside its
 // `if (share)` branch) gets a defined result back without a non-null assertion.
 export async function stampCard(card: SocialCardProps): Promise<SocialCardProps>;

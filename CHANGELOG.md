@@ -6,6 +6,34 @@ is *defined* — lives at
 
 ## [Unreleased]
 
+### Added
+- **Snapshot on every card worth posting** — 70 shareable surfaces, up from 23.
+  Coverage had tracked nothing but the order things were built: 12 of 29
+  card-bearing pages had a camera, and `/today`, the data wall people land on,
+  had eight cards and none. All 81 cards were audited and classified; 51 gained
+  a snapshot, 16 were deliberately left without one (prose, methodology notes,
+  live client feeds, and empty states — a camera on "Holder snapshot is being
+  built" exports a card that says nothing).
+- **`MetricCard` and `StatCard` accept `share`.** Both are server components with
+  no client importers, so they stamp the block height in the same render as their
+  data, exactly like `ChartCard`. 149 headline numbers previously had no way to
+  be shared at all.
+- **`NOT_LIVE`** (`components/share/stampCard.ts`) — marks a card built from a
+  dated snapshot rather than a live chain read. `/atom/genesis` renders a static
+  JSON file, so stamping a live block there claimed a freshness the data does not
+  have. Marked cards skip the status read and stamp the export date instead,
+  while their subtitle carries the data's real vintage. Skipping the read also
+  keeps such a page off the status cache's clock, which is what kept
+  `/atom/genesis` at the 1h revalidate its author chose.
+
+### Fixed
+- **`/validators` momentum shipped a `share=` with no `body:`**, so its PNG was a
+  bare title over blank space with the actual finding left behind on the page.
+- Two more stated-not-derived labels, found while adding cards to their pages:
+  `/atom/genesis` printed "share of the 236.2M genesis supply" with `genTotal` in
+  scope, and `/stakers/unbonding` printed "the next 21 days" beside
+  `u.schedule.length`.
+
 ### Fixed
 - **Charts drew straight through data they did not have.** The x-axis positioned
   points by array index, so a stretch the backfill has not reached collapsed to

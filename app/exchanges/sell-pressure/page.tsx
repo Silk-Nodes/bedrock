@@ -12,6 +12,7 @@
 
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { MetricCard } from "@/components/console/MetricCard";
+import { ShareBars } from "@/components/share/ShareCharts";
 import { BasisToggle } from "@/components/exchanges/BasisToggle";
 import { SellPressureDisclaimer } from "@/components/exchanges/SellPressureDisclaimer";
 import { Soon } from "@/components/console/Soon";
@@ -190,7 +191,14 @@ export default async function SellPressurePage({ searchParams }: { searchParams:
           {/* Route breakdown: the likelihood-weighted model, leg by leg */}
           {sp.routes.length > 0 && (
             <div className="span-12">
-              <IntelCard title="Sell routes · weighted model" meta="route weight × raw flow = weighted sell pressure">
+              <IntelCard title="Sell routes · weighted model" meta="route weight × raw flow = weighted sell pressure" shareFilename="bedrock-sell-routes"
+                share={{
+                  title: "How ATOM reaches a sell · Cosmos HUB",
+                  subtitle: `Route weight × raw flow · ${span}`,
+                  big: fmt(sp.weighted_total), unit: "ATOM weighted",
+                  context: "Each exchange-bound route is weighted by how likely it ends in an actual sale. Weighted flow is sell intent, not confirmed sales.",
+                  body: <ShareBars rows={sp.routes.map((r) => ({ label: ROUTE_META[r.route]?.label ?? r.route, value: r.weighted_atom, note: ROUTE_META[r.route] ? `· ×${ROUTE_META[r.route].weight}` : undefined }))} />,
+                }}>
                 <table className="broadsheet mcols-3">
                   <thead>
                     <tr><th>Route</th><th style={{ textAlign: "right" }}>Weight</th><th style={{ textAlign: "right" }} className="mhide3">Raw ATOM</th><th style={{ textAlign: "right" }}>Weighted ATOM</th><th style={{ textAlign: "right" }} className="mhide3">Transfers</th></tr>
@@ -221,7 +229,13 @@ export default async function SellPressurePage({ searchParams }: { searchParams:
               customer deposit" signal (exchanges need it to credit the account). */}
           {memoPct != null && (
             <div className="span-12">
-              <IntelCard title="Deposit confidence · memo signal" meta="forward-only, parsed from tx bodies">
+              <IntelCard title="Deposit confidence · memo signal" meta="forward-only, parsed from tx bodies" shareFilename="bedrock-deposit-memo"
+                share={{
+                  title: "Are ATOM exchange deposits real customer sends? · Cosmos HUB",
+                  subtitle: "Share of direct exchange deposits carrying a memo",
+                  big: `${memoPct!.toFixed(0)}%`, unit: "carried a memo",
+                  context: `${sp.memo_deposits.toLocaleString("en-US")} of ${sp.memo_deposit_total.toLocaleString("en-US")} direct sends. An exchange needs a memo to credit a deposit to the right sub-account, so a memo is strong evidence of a real customer deposit rather than an internal wallet shuffle. Memo capture is forward-only.`,
+                }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 30, flexWrap: "wrap" }}>
                   <div style={{ flexShrink: 0 }}>
                     <div style={{ fontSize: 36, fontWeight: 600, lineHeight: 1, color: memoPct >= 50 ? "var(--moss)" : "var(--ink)", fontVariantNumeric: "tabular-nums" }}>{memoPct.toFixed(0)}%</div>

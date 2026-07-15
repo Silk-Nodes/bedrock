@@ -4,6 +4,7 @@
 
 import { ConsolePage, ConsoleModule, StatusStrip, StatusStripCell, SectionLabel, IntelCard } from "@/components/console/Console";
 import { AddressLink } from "@/components/address/AddressLink";
+import { ShareBars } from "@/components/share/ShareCharts";
 import { getRecentFlows } from "@/lib/indexer";
 import { seo } from "@/lib/seo";
 
@@ -81,7 +82,14 @@ export default async function TodayFeed({ searchParams }: { searchParams: Promis
 
       <div className="console-grid">
         <div className="span-12">
-          <IntelCard title="Network activity" meta="live, on-chain">
+          <IntelCard title="Network activity" meta="live, on-chain" shareFilename="bedrock-network-activity"
+            share={flows.length ? {
+              title: "Cosmos Hub network activity",
+              subtitle: `Largest on-chain events of ${min.toLocaleString("en-US")} ATOM or more · recent blocks`,
+              big: String(flows.length), unit: "events",
+              context: "Live from the Bedrock indexer tip-follower: delegations, undelegations, claims and transfers as blocks land.",
+              body: <ShareBars rows={flows.slice(0, 8).map((f) => ({ label: KIND_LABEL[f.kind] ?? f.kind, value: Number(f.amount_uatom) / 1e6, color: kindColor(f.kind), note: `· ${ago(f.time)}` }))} />,
+            } : undefined}>
             {/* Size filter */}
             <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
               {TIERS.map((t) => (

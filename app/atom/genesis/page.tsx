@@ -6,6 +6,7 @@
 
 import { MetricCard } from "@/components/console/MetricCard";
 import { ShareBars, ShareStack } from "@/components/share/ShareCharts";
+import { NOT_LIVE } from "@/components/share/stampCard";
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { AddressLink } from "@/components/address/AddressLink";
 import { HoverTip } from "@/components/HoverTip";
@@ -82,6 +83,7 @@ export default function GenesisHolders() {
           <IntelCard title="Where the genesis ATOM sits today" meta={`share of the ${compact(genTotal)} genesis supply`} shareFilename="bedrock-genesis-retention"
               share={{
                 title: "Where the genesis ATOM sits today · Cosmos HUB",
+                blockHeight: NOT_LIVE,   // static snapshot, not a live chain read
                 subtitle: `Share of the ${compact(genTotal)} ATOM genesis supply · as of ${genesis.snapshot}`,
                 big: `${((nowTotal / genTotal) * 100).toFixed(1)}%`, unit: "still in the original wallets",
                 context: "Balances are the current on-chain state of each 2019 address. ATOM moved to a new wallet reads here as an exit.",
@@ -128,6 +130,7 @@ export default function GenesisHolders() {
           <IntelCard title="OG survivors" meta="genesis wallets still holding, largest first" shareFilename="bedrock-genesis-survivors"
               share={{
                 title: "Genesis ATOM survivors · Cosmos HUB",
+                blockHeight: NOT_LIVE,   // static snapshot, not a live chain read
                 subtitle: `Still holding from the original 2019 address · as of ${genesis.snapshot}`,
                 big: String(survivors.length), unit: `of the ${genesis.count}`,
                 context: `Holding ${compact(nowTotal)} ATOM · ${accumulated.length} hold more than they did at genesis · ${compact(stakedTotal)} ATOM bonded.`,
@@ -177,6 +180,7 @@ export default function GenesisHolders() {
           <IntelCard title="Biggest genesis exits" meta="largest 2019 wallets now fully drained" shareFilename="bedrock-genesis-exits"
               share={{
                 title: "Biggest genesis exits · Cosmos HUB",
+                blockHeight: NOT_LIVE,   // static snapshot, not a live chain read
                 subtitle: `Largest 2019 wallets now fully drained · as of ${genesis.snapshot}`,
                 big: String(exited.length), unit: "wallets fully exited",
                 context: "Pre-Stargate history is still indexing, so an exit shows the original wallet is empty, not where the ATOM went.",
