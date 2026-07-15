@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 244" width="200" height="244" role="img" aria-label="Bedrock">
+  <title>Bedrock</title>
+  
+  <text x="100" y="174" font-family="Archivo Black, system-ui, sans-serif" font-weight="900" font-size="220" letter-spacing="-9" text-anchor="middle" fill="#15140F">B</text>
+  
+  <g transform="translate(10, 194)">
+    <path d="M0,46 L0,28 L18,20 L36,30 L52,14 L70,26 L88,10 L106,22 L124,6 L142,18 L158,12 L180,22 L180,46 Z" fill="#3B2A6B" fill-opacity="0.35"></path>
+    <path d="M0,46 L0,34 L20,30 L38,38 L56,22 L74,32 L92,20 L110,30 L128,16 L146,26 L164,20 L180,30 L180,46 Z" fill="#3B2A6B" fill-opacity="0.6"></path>
+    <path d="M0,46 L0,40 L22,38 L40,44 L58,32 L76,40 L94,30 L112,38 L130,28 L148,34 L166,30 L180,38 L180,46 Z" fill="#15140F"></path>
+    <polyline points="0,40 22,38 40,44 58,32 76,40 94,30 112,38 130,28 148,34 166,30 180,38" fill="none" stroke="#5B4A9A" stroke-width="1"></polyline>
+  </g>
+</svg>

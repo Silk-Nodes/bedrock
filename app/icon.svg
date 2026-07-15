@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Bedrock">
+  <title>Bedrock</title>
+  <rect width="64" height="64" fill="#3B2A6B"></rect>
+  <text x="32" y="50" font-family="Archivo Black, system-ui, sans-serif" font-weight="900" font-size="68" letter-spacing="-3" text-anchor="middle" fill="#ECE7D8">B</text>
+  <path d="M0,64 L0,58 L8,56 L16,60 L24,54 L32,58 L40,52 L48,56 L56,52 L64,56 L64,64 Z" fill="#A99BFF"></path>
+</svg>

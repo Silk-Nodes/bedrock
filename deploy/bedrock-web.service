@@ -1,0 +1,23 @@
+[Unit]
+Description=Bedrock web (Next.js production server)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/bedrock/web
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=0.0.0.0
+# Launch Next directly via Node so there is no pnpm/corepack runtime dependency.
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -H 0.0.0.0 -p 3000
+Restart=always
+RestartSec=5
+User=zoltan
+Group=zoltan
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

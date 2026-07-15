@@ -1,0 +1,23 @@
+# Bedrock web — append this block to the VM's /etc/caddy/Caddyfile
+# (or drop it in /etc/caddy/conf.d/ if the main Caddyfile imports that dir).
+#
+# Caddy will obtain + renew TLS from Let's Encrypt automatically once the
+# domain's DNS A/AAAA record points at this VM's public IP.
+
+bedrock.silknodes.io {
+    encode zstd gzip
+
+    # Next.js production server (systemd: bedrock-web.service) on localhost:3000
+    reverse_proxy 127.0.0.1:3000
+
+    # Long-cache the immutable build assets
+    @static path /_next/static/*
+    header @static Cache-Control "public, max-age=31536000, immutable"
+
+    # Light security headers
+    header {
+        X-Content-Type-Options nosniff
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+}
