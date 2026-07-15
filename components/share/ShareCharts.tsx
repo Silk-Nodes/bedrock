@@ -3,7 +3,8 @@
 // RelPerfShareChart pattern. Each takes the same data the live chart on the
 // page already has in scope, so wiring a card is one `body:` prop.
 
-import { matchGapOverride, type Series, type GapOverride } from "../charts/LineChart";
+import type { Series } from "../charts/LineChart";
+import { matchGapOverride, type GapOverride } from "../charts/gaps";
 
 export function fmtShare(n: number): string {
   const abs = Math.abs(n);
