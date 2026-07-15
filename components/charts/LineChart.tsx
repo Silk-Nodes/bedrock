@@ -36,6 +36,31 @@ export type Series = {
 // stay connected and only structural holes split the line.
 const GAP_FACTOR = 4;
 
+/** A known window whose absence has a specific cause, matched against a hole in
+ *  the data by date. Plain data, not a function: these charts are Client
+ *  Components and RSC cannot pass a function across the boundary. */
+export type GapOverride = { from: string; to: string; label: string };
+
+/**
+ * Names a hole when a known override covers it, else null.
+ *
+ * A data hole runs from the last row BEFORE it to the first row AFTER it, so it
+ * is always at least as wide as the real window inside it. Matched with a day of
+ * tolerance at each edge rather than by equality, because the bounding rows are
+ * whatever the series happened to have, not the bounding blocks.
+ */
+export function matchGapOverride(from: string, to: string, overrides?: GapOverride[]): string | null {
+  if (!overrides?.length) return null;
+  const DAY = 86_400_000;
+  const a = Date.parse(from);
+  const b = Date.parse(to);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  for (const o of overrides) {
+    if (a <= Date.parse(o.from) + DAY && b >= Date.parse(o.to) - DAY) return o.label;
+  }
+  return null;
+}
+
 export type TimeWindow = { id: string; label: string; takeLast: number };
 
 const DEFAULT_WINDOWS: TimeWindow[] = [
@@ -52,15 +77,25 @@ export function LineChart({
   height = 320,
   legend = true,
   gapLabel = "NO DATA",
+  gapOverrides,
 }: {
   series: Series[];
   yLabel?: string;
   windows?: TimeWindow[];
   height?: number;
   legend?: boolean;
-  /** Shown inside a gap band. Say WHY the data is missing when you know
-   *  (e.g. "BACKFILL IN PROGRESS"); the default claims nothing beyond absence. */
+  /** Shown inside a gap band when no override matches. Say WHY the data is
+   *  missing when you know; the default claims nothing beyond absence. */
   gapLabel?: string;
+  /**
+   * Holes whose cause is known and specific, matched by date.
+   *
+   * Needed because holes on one chart can have DIFFERENT causes, and only some
+   * of them resolve: "we have not read this yet" closes as the backfill runs,
+   * "no blocks were ever produced here" never will. One label across both
+   * promises data that is never coming.
+   */
+  gapOverrides?: GapOverride[];
 }) {
   const H = height;
   const gradId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
@@ -129,16 +164,21 @@ export function LineChart({
   // Structural holes: stretches the chart must not draw across.
   const gaps = useMemo(() => {
     if (!time.ok) return [];
-    const out: { x0: number; x1: number; days: number }[] = [];
+    const out: { x0: number; x1: number; days: number; label: string }[] = [];
     for (let i = 1; i < time.ts.length; i++) {
       const d = time.ts[i] - time.ts[i - 1];
       if (d > time.gapMs) {
-        out.push({ x0: xAtTime(time.ts[i - 1]), x1: xAtTime(time.ts[i]), days: Math.round(d / 86_400_000) });
+        out.push({
+          x0: xAtTime(time.ts[i - 1]),
+          x1: xAtTime(time.ts[i]),
+          days: Math.round(d / 86_400_000),
+          label: matchGapOverride(dates[i - 1], dates[i], gapOverrides) ?? gapLabel,
+        });
       }
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [time, plotW]);
+  }, [time, plotW, dates, gapLabel, gapOverrides]);
 
   const brokenAt = (i: number) => time.ok && i > 0 && time.ts[i] - time.ts[i - 1] > time.gapMs;
 
@@ -284,7 +324,7 @@ export function LineChart({
                     userSelect: "none",
                   }}
                 >
-                  {gapLabel}
+                  {g.label}
                 </text>
               )}
               {g.x1 - g.x0 > 90 && (

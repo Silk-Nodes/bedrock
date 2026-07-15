@@ -6,6 +6,20 @@ is *defined* — lives at
 
 ## [Unreleased]
 
+### Fixed
+- **A chart gap said "backfill in progress" over blocks that never existed.**
+  `/exchanges` has two holes and they are not the same fact. 2023-03-28 →
+  2026-06-08 is the cosmoshub-4 backfill, still climbing, and it closes on its
+  own. 2019-12-11 → 2020-08-07 is the cosmoshub-2 → cosmoshub-3 boundary: heights
+  2,902,002 and 2,902,003 are consecutive and 240 days apart, so the chain
+  produced no blocks there and nothing will ever fill it. Labelling both the same
+  promised readers data that was never coming. Gap causes are now named per gap
+  (`CHAIN_GAPS` in `data/methodology.ts`, matched by `matchGapOverride`), and the
+  coverage line counts **indexable** days, excluding the 240 the chain never
+  produced, rather than putting them in a denominator next to the words "backfill
+  in progress".
+
+
 ### Added
 - **Snapshot on every card worth posting** — 70 shareable surfaces, up from 23.
   Coverage had tracked nothing but the order things were built: 12 of 29
