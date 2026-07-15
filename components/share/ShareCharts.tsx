@@ -24,6 +24,7 @@ export function ShareLineChart({
   prefix = "",
   suffix = "",
   takeLast,
+  gapLabel = "NO DATA",
 }: {
   series: Series[];
   height?: number;
@@ -31,6 +32,8 @@ export function ShareLineChart({
   prefix?: string;   // e.g. "$"
   suffix?: string;   // e.g. "%"
   takeLast?: number;
+  /** Shown inside a gap band; say WHY the data is missing when you know. */
+  gapLabel?: string;
 }) {
   const H = height;
   const PAD = { top: 16, right: 20, bottom: 30, left: 64 };
@@ -45,8 +48,29 @@ export function ShareLineChart({
   const yMin = mn - pad, yMax = mx + pad, yRange = yMax - yMin || 1;
   const n = Math.max(...clipped.map((s) => s.points.length));
   const plotW = W - PAD.left - PAD.right, plotH = H - PAD.top - PAD.bottom;
-  const x = (i: number, len: number) => PAD.left + (i / Math.max(1, len - 1)) * plotW;
+
+  // Same time scale as the live LineChart, and for the same reason: the card is
+  // the artifact that gets posted, so it is the last place that should imply a
+  // continuity the data lacks. Index spacing hid a 1,168-day hole at zero width
+  // and drew straight through it. Falls back to index spacing when the labels
+  // are not parseable dates. See the note in components/charts/LineChart.tsx.
+  const ts = clipped[0].points.map((p) => Date.parse(p.date));
+  const timeOk = ts.length > 1 && ts.every(Number.isFinite) && ts[ts.length - 1] > ts[0];
+  const steps = timeOk ? ts.slice(1).map((t, i) => t - ts[i]).filter((s) => s > 0).sort((a, b) => a - b) : [];
+  const median = steps.length ? steps[Math.floor(steps.length / 2)] : 0;
+  const gapMs = timeOk && median > 0 ? median * 4 : Infinity;
+  const xAtTime = (t: number) => PAD.left + ((t - ts[0]) / (ts[ts.length - 1] - ts[0] || 1)) * plotW;
+  const x = (i: number, len: number) =>
+    timeOk && i < ts.length ? xAtTime(ts[i]) : PAD.left + (i / Math.max(1, len - 1)) * plotW;
   const y = (v: number) => PAD.top + plotH - ((v - yMin) / yRange) * plotH;
+
+  const gaps = timeOk
+    ? ts.slice(1).flatMap((t, i) =>
+        t - ts[i] > gapMs
+          ? [{ x0: xAtTime(ts[i]), x1: xAtTime(t), days: Math.round((t - ts[i]) / 86_400_000) }]
+          : [],
+      )
+    : [];
   const ticks = [yMax, (yMax + yMin) / 2, yMin];
   const first = clipped[0].points[0]?.date ?? "";
   const last = clipped[0].points[clipped[0].points.length - 1]?.date ?? "";
@@ -78,17 +102,58 @@ export function ShareLineChart({
         {yMin < 0 && yMax > 0 && (
           <line x1={PAD.left} x2={W - PAD.right} y1={y(0)} y2={y(0)} stroke="var(--ink-40)" strokeWidth={1.25} />
         )}
-        {[...clipped].sort((a, b) => (a.emphasis ? 1 : 0) - (b.emphasis ? 1 : 0)).map((s) => (
-          <polyline
-            key={s.label}
-            points={s.points.map((p, i) => `${x(i, s.points.length)},${y(p.value)}`).join(" ")}
-            fill="none"
-            stroke={s.color}
-            strokeWidth={s.emphasis ? 3.4 : 2.2}
-            opacity={s.emphasis ? 1 : 0.92}
-            strokeLinejoin="round"
-          />
+        {/* Un-indexed stretches, marked. Empty space alone would read as "flow
+            was zero" on a card with no page around it to explain otherwise. */}
+        {gaps.map((g, i) => (
+          <g key={`gap-${i}`}>
+            <rect
+              x={g.x0}
+              y={PAD.top}
+              width={Math.max(0, g.x1 - g.x0)}
+              height={plotH}
+              fill="var(--paper-3)"
+              opacity={0.55}
+              stroke="var(--ink-20)"
+              strokeWidth={1}
+              strokeDasharray="3 4"
+            />
+            {g.x1 - g.x0 > 150 && (
+              <text
+                x={(g.x0 + g.x1) / 2}
+                y={PAD.top + plotH / 2 + 4}
+                textAnchor="middle"
+                fontFamily="var(--font-mono)"
+                fontSize="12"
+                fill="var(--ink-40)"
+                letterSpacing="1.4"
+              >
+                {gapLabel} · {g.days.toLocaleString("en-US")} DAYS
+              </text>
+            )}
+          </g>
         ))}
+        {[...clipped].sort((a, b) => (a.emphasis ? 1 : 0) - (b.emphasis ? 1 : 0)).map((s) => {
+          // One polyline per contiguous run, so the stroke never crosses a hole.
+          const runs: number[][] = [];
+          let run: number[] = [];
+          s.points.forEach((_, i) => {
+            if (timeOk && i > 0 && ts[i] - ts[i - 1] > gapMs && run.length) { runs.push(run); run = []; }
+            run.push(i);
+          });
+          if (run.length) runs.push(run);
+          return runs.map((idxs, ri) => (
+            <polyline
+              key={`${s.label}-${ri}`}
+              points={idxs.map((i) => `${x(i, s.points.length)},${y(s.points[i].value)}`).join(" ")}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={s.emphasis ? 3.4 : 2.2}
+              opacity={s.emphasis ? 1 : 0.92}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          ));
+        })}
         <text x={PAD.left} y={H - 8} fontFamily="var(--font-mono)" fontSize="13" fill="var(--ink-40)">{first}</text>
         <text x={W - PAD.right} y={H - 8} textAnchor="end" fontFamily="var(--font-mono)" fontSize="13" fill="var(--ink-40)">{last}</text>
         {n < 2 && null}

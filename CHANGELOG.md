@@ -6,6 +6,35 @@ is *defined* — lives at
 
 ## [Unreleased]
 
+### Fixed
+- **Charts drew straight through data they did not have.** The x-axis positioned
+  points by array index, so a stretch the backfill has not reached collapsed to
+  zero width and the line crossed it as though flow had continued. On
+  `/exchanges` that hid a **1,168-day hole** (2023-03-28 → 2026-06-08, where the
+  cosmoshub-4 cursor has only reached block 14,732,485) and put `2022-10-17` one
+  tick from `2026-07-15` at the same spacing as a 199-day step. Points now sit at
+  their real position in time, lines break at holes, and each hole is drawn as a
+  band naming what it is and how long it lasts, because empty space alone reads
+  as "flow was zero" rather than "not read yet". Series are only rows for days
+  that HAVE data, so the two are indistinguishable from the data alone. Fixed in
+  the exported PNG too, which is the artifact that actually gets posted. Charts
+  with continuous data are unaffected: index and time agree exactly there.
+- **Window labels stated the window requested, not the window returned.** Twelve
+  cases, one root cause: the indexer already reports the real window and the UI
+  discarded it in favour of the URL parameter. `getExchangeNetFlow` has always
+  returned the `hours` it actually aggregated and **nothing read it**. The worst:
+  `/exchanges/top-movers` printed "last ~30d" over a feed capped at 200 rows that
+  in practice reaches back about **36 hours**. Also `/today` ("90 days", "30d",
+  "24h", "last 7d", all hardcoded beside calls that return their own window),
+  `/atom/whales` ("top 100" three times, next to a correct `rows.length` on the
+  same array), `/atom/market` ("1 year" whenever the series had more than ONE
+  point; it is 364d), `/signals/whales`, `/exchanges/per-exchange`,
+  `/stakers/rewards`, and `/atom/market/relative` (`slice(-365)` takes 365
+  *points*, not days). `/atom/holders` had the inverse: the label counted the
+  array while the table rendered 50. `spanLabel` is lifted out of `/validators`,
+  the one page that was already doing this right, so the rest share it instead of
+  each growing their own copy.
+
 ### Changed
 - **Snapshot cards stamp the block they were built from.** Cards carry
   `BLOCK 32,043,284` rather than `EXPORTED 15 Jul 2026` wherever the indexer is

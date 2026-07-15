@@ -32,13 +32,20 @@ export default async function AtomRelative() {
     );
   }
 
+  // RelPerfShareChart slices the last REL_DAYS *points*, not days, so a sparse
+  // series makes "over 1 year" wrong the same way the Binance card's
+  // takeLast={365} was. Name the dates the plotted points actually span.
+  const REL_DAYS = 365;
+  const relPts = hist.series[0]?.points.slice(-REL_DAYS) ?? [];
+  const relWindow = relPts.length > 1 ? `${relPts[0].date} → ${relPts[relPts.length - 1].date}` : "the live window";
+
   return (
     <ConsolePage>
       <ConsoleModule lead title="ATOM · Relative performance" dot="var(--hub)" meta="vs the majors · indexed to the window start · live market data">
         <div className="console-grid">
           {hist.live && (
             <div className="span-12">
-              <IntelCard title="ATOM vs the majors" meta="rebased to 0% at window start" shareFilename="bedrock-atom-relative" share={{ title: "ATOM vs the majors · Cosmos HUB", subtitle: "Relative performance over 1 year, rebased to 0% at the start", body: <RelPerfShareChart series={hist.series} days={365} /> }}>
+              <IntelCard title="ATOM vs the majors" meta="rebased to 0% at window start" shareFilename="bedrock-atom-relative" share={{ title: "ATOM vs the majors · Cosmos HUB", subtitle: `Relative performance · ${relWindow}, rebased to 0% at the start`, body: <RelPerfShareChart series={hist.series} days={REL_DAYS} /> }}>
                 <RelPerfChart series={hist.series} />
               </IntelCard>
             </div>

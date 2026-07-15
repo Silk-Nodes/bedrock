@@ -8,7 +8,7 @@ import Link from "next/link";
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { MetricCard } from "@/components/console/MetricCard";
 import { getLiveValidators } from "@/lib/validators";
-import { getValidatorFlow } from "@/lib/indexer";
+import { getValidatorFlow, spanLabel } from "@/lib/indexer";
 import { seo } from "@/lib/seo";
 
 function fmtCompact(n: number): string {
@@ -22,14 +22,6 @@ function fmtSigned(n: number): string {
   const c = a >= 1_000_000 ? `${(a / 1_000_000).toFixed(2)}M` : a >= 1_000 ? `${(a / 1_000).toFixed(1)}k` : Math.round(a).toString();
   return (n >= 0 ? "+" : "−") + c;
 }
-function flowSpan(s: string | null, e: string | null): string {
-  if (!s || !e) return "recent";
-  const h = (new Date(e).getTime() - new Date(s).getTime()) / 3_600_000;
-  if (h < 1.5) return `${Math.max(1, Math.round(h * 60))}m`;
-  if (h < 36) return `${Math.round(h)}h`;
-  return `${Math.round(h / 24)}d`;
-}
-
 export const metadata = seo({ title: "Validators", description: "The Cosmos Hub validator set: voting power, commission, concentration, and the Nakamoto coefficient, ranked from on-chain data.", path: "/validators", keywords: ["Cosmos Hub validators", "ATOM validators", "validator commission", "Nakamoto coefficient"] });
 export const revalidate = 300;
 
@@ -46,7 +38,7 @@ export default async function ValidatorsConsole() {
   const momoName = (oper: string) => monikerByOper.get(oper) ?? `${oper.slice(0, 14)}…`;
   const gainers = flow.rows.filter((r) => r.net_atom > 0).slice(0, 5);
   const losers = flow.rows.filter((r) => r.net_atom < 0).slice(-5).reverse();
-  const span = flowSpan(flow.window_start, flow.window_end);
+  const span = spanLabel(flow.window_start, flow.window_end);
   const hasMomentum = flow.live && (gainers.length > 0 || losers.length > 0);
 
   // Live shapes for the lead cards (cross-sectional, honest live data).

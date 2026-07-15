@@ -517,6 +517,31 @@ export type ExchangeNetFlowRow = {
   withdraw_count: number;
 };
 
+// Label a window from the hours the indexer says it actually aggregated, never
+// from the hours we asked for. `getExchangeNetFlow` has always returned the real
+// `hours` and every page threw it away in favour of the URL parameter, so a
+// window the indexer could only partly cover still printed "~30d". Falls back to
+// the requested value only when the indexer is unreachable, where the page shows
+// an offline state anyway.
+export function windowLabel(hours: number): string {
+  if (!Number.isFinite(hours) || hours <= 0) return "no window";
+  if (hours < 48) return `${Math.round(hours)}h`;
+  return `${Math.round(hours / 24)}d`;
+}
+
+// Label the span between two timestamps the indexer returned with its data.
+// Lifted out of /validators, which was the one page doing this correctly, so the
+// pages that hardcoded the same window can share the honest version instead of
+// each growing their own.
+export function spanLabel(start: string | null, end: string | null): string {
+  if (!start || !end) return "recent";
+  const h = (Date.parse(end) - Date.parse(start)) / 3_600_000;
+  if (!Number.isFinite(h) || h <= 0) return "recent";
+  if (h < 1.5) return `${Math.max(1, Math.round(h * 60))}m`;
+  if (h < 36) return `${Math.round(h)}h`;
+  return `${Math.round(h / 24)}d`;
+}
+
 // Net exchange flow per entity over a window: deposits minus withdrawals.
 // Positive net = ATOM moving onto exchanges (potential sell pressure); negative
 // = moving off (accumulation). High+ confidence labels only.

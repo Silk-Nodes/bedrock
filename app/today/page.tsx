@@ -11,7 +11,7 @@ import { WeeklyFlowChart } from "@/components/charts/WeeklyFlowChart";
 import { getTodayFeed } from "@/lib/todayFeed";
 import { getLiveChain } from "@/lib/chain";
 import { getLiveAtomPrice, getAtomPriceHistory } from "@/lib/price";
-import { getCohortFlows, getRewardDaily, getExchangeNetFlow, getValidatorFlow } from "@/lib/indexer";
+import { getCohortFlows, getRewardDaily, getExchangeNetFlow, getValidatorFlow, windowLabel, spanLabel } from "@/lib/indexer";
 import { getLiveUndelegations } from "@/lib/undelegations";
 import { getProposalList } from "@/lib/gov";
 import { getLiveValidators } from "@/lib/validators";
@@ -62,6 +62,14 @@ export default async function Console() {
     getLiveValidators(0), getTodayFeed(),
   ]);
 
+  // Windows named from what each source returned, not from what was requested.
+  // Every one of these was hardcoded, and /validators was already deriving the
+  // same validator-flow window correctly from the same call.
+  const priceDays = hist.points.length;                       // getAtomPriceHistory(90) can return fewer
+  const rewardDays = rewards.points.length;                   // getRewardDaily(30) likewise
+  const netflowLabel = windowLabel(netflow.hours);            // the indexer echoes the hours it aggregated
+  const valflowSpan = spanLabel(valflow.window_start, valflow.window_end);
+
   // Price range over the window.
   const prices = hist.points.map((p) => p.value);
   const hi = prices.length ? Math.max(...prices) : 0;
@@ -96,7 +104,7 @@ export default async function Console() {
 
           {/* ── Hero row: price + staking economy ── */}
           <div className="span-6">
-            <IntelCard title="ATOM price" meta="90 days · daily close">
+            <IntelCard title="ATOM price" meta={`${priceDays} days · daily close`}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
               <div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4 }}>
@@ -113,7 +121,7 @@ export default async function Console() {
           </div>
 
           <div className="span-6">
-            <IntelCard title="Staking economy" meta="live params · daily reward claims, 30d">
+            <IntelCard title="Staking economy" meta={`live params · daily reward claims, ${rewardDays}d`}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
               <div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4 }}>
@@ -213,7 +221,7 @@ export default async function Console() {
           </div>
 
           <div className="span-4">
-            <IntelCard title="Exchange netflow · 24h" meta="per exchange · deposits − withdrawals">
+            <IntelCard title={`Exchange netflow · ${netflowLabel}`} meta="per exchange · deposits − withdrawals">
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
                 <span style={{ ...BIG, fontSize: 28, color: netTotal <= 0 ? "var(--moss)" : "var(--iron)" }}>{fmtSigned(netTotal)}</span>
@@ -243,7 +251,7 @@ export default async function Console() {
           </div>
 
           <div className="span-4">
-            <IntelCard title="Validator momentum" meta="net delegation · last 7d">
+            <IntelCard title="Validator momentum" meta={`net delegation · last ${valflowSpan}`}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                 <div className="data" style={{ fontSize: 9.5, letterSpacing: "0.09em", textTransform: "uppercase", color: "var(--moss)" }}>Gaining</div>

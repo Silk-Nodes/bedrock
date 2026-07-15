@@ -6,7 +6,7 @@ import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Cons
 import { MetricCard } from "@/components/console/MetricCard";
 import { Soon } from "@/components/console/Soon";
 import { AddressLink } from "@/components/address/AddressLink";
-import { getFlowFeed } from "@/lib/indexer";
+import { getFlowFeed, windowLabel } from "@/lib/indexer";
 import { ShareBars } from "@/components/share/ShareCharts";
 import { seo } from "@/lib/seo";
 
@@ -35,18 +35,25 @@ export default async function TopMoversPage({ searchParams }: { searchParams: Pr
   const ex = sp?.ex ?? "";
   const dir = sp?.dir === "deposit" || sp?.dir === "withdrawal" ? sp.dir : "";
   const wQ = sp?.w === "24" ? 24 : sp?.w === "168" ? 168 : 720;
-  const winLabel = wQ === 24 ? "24h" : wQ === 168 ? "7d" : "~30d";
 
-  const { flows, live } = await getFlowFeed({ exchangeOnly: true, entity: ex, direction: dir, minAtom: 100, limit: 200, hours: wQ });
+  const FEED_LIMIT = 200;
+  const { flows, live } = await getFlowFeed({ exchangeOnly: true, entity: ex, direction: dir, minAtom: 100, limit: FEED_LIMIT, hours: wQ });
   // Top movers ranks true customer flow only; reward payouts and internal moves
-  // (protocol counterparties) are classified separately and excluded. The feed
-  // API has no window param, so the Window control cuts by timestamp here.
+  // (protocol counterparties) are classified separately and excluded.
   const cutoff = Date.now() - wQ * 3600_000;
-  const ranked = [...flows]
+  const inWindow = [...flows]
     .filter((f) => f.action === "deposit" || f.action === "withdrawal")
-    .filter((f) => new Date(f.time).getTime() >= cutoff)
-    .sort((a, b) => b.amount_atom - a.amount_atom)
-    .slice(0, 30);
+    .filter((f) => new Date(f.time).getTime() >= cutoff);
+  const ranked = [...inWindow].sort((a, b) => b.amount_atom - a.amount_atom).slice(0, 30);
+
+  // The feed returns at most FEED_LIMIT rows, newest first. On a busy venue those
+  // rows can run out long before the requested window does, so asking for 30d and
+  // receiving six hours of flow still printed "last ~30d". When the cap is hit we
+  // only ever saw back to the oldest row returned, so that is what gets named;
+  // when it is not hit we genuinely saw the whole window.
+  const capped = flows.length >= FEED_LIMIT;
+  const oldest = inWindow.length ? Math.min(...inWindow.map((f) => new Date(f.time).getTime())) : Date.now();
+  const winLabel = capped ? windowLabel((Date.now() - oldest) / 3600_000) : windowLabel(wQ);
 
   if (!live || ranked.length === 0) {
     return (

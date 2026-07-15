@@ -158,11 +158,11 @@ export default async function WhalesPage() {
           <div className="span-2"><StatCard label="Net sellers" value={`${sellers}`} accent="var(--iron)" sub="≥25% sent to exchanges" /></div>
           <div className="span-2"><StatCard label="Exchanges" value={`${exchanges}`} accent="var(--slate)" sub="labeled CEX wallets" /></div>
           <div className="span-2"><StatCard label="Oldest account" value={oldest != null ? `#${compact(oldest)}` : "·"} accent="var(--hub-2)" sub="lowest account number" /></div>
-          <div className="span-2"><StatCard label="Sent to CEX" value={compact(totalSentCex)} unit="ATOM" accent="var(--sand)" sub="top 100, indexed history" /></div>
+          <div className="span-2"><StatCard label="Sent to CEX" value={compact(totalSentCex)} unit="ATOM" accent="var(--sand)" sub={`top ${n}, indexed history`} /></div>
 
           {/* Account vintage histogram */}
           <div className="span-6">
-            <IntelCard title="Account vintage" meta="when the top 100 first appeared · earlier → newer">
+            <IntelCard title="Account vintage" meta={`when the top ${n} first appeared · earlier → newer`}>
               <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
                 {VBUCKETS.map((b, i) => {
                   const c = vintageCounts[i];
@@ -183,7 +183,7 @@ export default async function WhalesPage() {
 
           {/* Behavior mix */}
           <div className="span-6">
-            <IntelCard title="Behavior mix" meta="how the top 100 split by conduct">
+            <IntelCard title="Behavior mix" meta={`how the top ${n} split by conduct`}>
               <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
                 {behaviorMix.map((b) => (
                   <div key={b.tag} style={{ display: "flex", alignItems: "center", gap: 12 }}>

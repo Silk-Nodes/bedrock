@@ -10,6 +10,7 @@ import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Cons
 import { LineChart, type Series } from "@/components/charts/LineChart";
 import { ATOM_TOKEN } from "@/data/atom";
 import { getLiveAtomMarket, getAtomMarketChart } from "@/lib/price";
+import { spanLabel } from "@/lib/indexer";
 import { ShareLineChart, ShareRange } from "@/components/share/ShareCharts";
 import { seo } from "@/lib/seo";
 
@@ -62,7 +63,16 @@ export default async function AtomMarket() {
   const priceSeries: Series[] = [{ label: "Price", color: "var(--hub)", points: hasHist ? chart.price : m.spark }];
   const volumeSeries: Series[] = [{ label: "Volume", color: "var(--sand)", points: chart.volume }];
   const mcapSeries: Series[] = [{ label: "Market cap", color: "var(--hub-2)", points: chart.mcap }];
-  const histMeta = hasHist ? "1 year · daily · live" : "7-day · live";
+
+  // "1 year" was printed whenever the series had more than ONE point. The
+  // provider asks for 364 days and returns whatever survives its finite-value
+  // filter, so the label has to count what arrived. Each series is counted
+  // separately: volume and mcap can come back shorter than price.
+  const daysLabel = (pts: { date: string }[]) =>
+    pts.length > 1 ? `${spanLabel(pts[0].date, pts[pts.length - 1].date)} · daily · live` : "unavailable";
+  const histMeta = hasHist ? daysLabel(chart.price) : "7-day · live";
+  const windowOf = (pts: { date: string }[]) =>
+    pts.length > 1 ? `${pts[0].date} → ${pts[pts.length - 1].date}` : "the live window";
 
   // 52-week range + position, derived from the daily series (Coinpaprika's ticker
   // carries no intraday high/low), plus a more meaningful "where it sits" band.
@@ -104,7 +114,7 @@ export default async function AtomMarket() {
               shareFilename="bedrock-atom-price"
               share={{
                 title: "ATOM price · Cosmos HUB",
-                subtitle: "Live ATOM price over the past year",
+                subtitle: `Live ATOM price · ${windowOf(chart.price)}`,
                 context: "Price and performance are live from CoinGecko. ATOM has no max supply, so circulating equals total and FDV adds nothing.",
                 body: <ShareLineChart series={priceSeries} prefix="$" height={235} />,
               }}
@@ -141,12 +151,12 @@ export default async function AtomMarket() {
           <div className="span-8">
             <ChartCard
               title="Trading volume"
-              meta={hasHist ? "1 year · daily · live" : "unavailable"}
+              meta={daysLabel(chart.volume)}
               accentColor="var(--sand)"
               shareFilename="bedrock-atom-volume"
               share={{
                 title: "ATOM trading volume · Cosmos HUB",
-                subtitle: "Daily reported trading volume over the past year",
+                subtitle: `Daily reported trading volume · ${windowOf(chart.volume)}`,
                 context: "Exchange-reported daily volume from CoinGecko. Spikes mark days of heavy turnover relative to market cap.",
                 body: <ShareLineChart series={volumeSeries} prefix="$" height={235} />,
               }}
@@ -176,12 +186,12 @@ export default async function AtomMarket() {
             <div className="span-12">
               <ChartCard
                 title="Market cap over time"
-                meta="1 year · daily · live"
+                meta={daysLabel(chart.mcap)}
                 accentColor="var(--hub-2)"
                 shareFilename="bedrock-atom-mcap"
                 share={{
                   title: "ATOM market cap over time · Cosmos HUB",
-                  subtitle: "Daily market cap over the past year",
+                  subtitle: `Daily market cap · ${windowOf(chart.mcap)}`,
                   context: "Market cap (price × circulating supply) from CoinGecko. Because ATOM has no max supply and inflates ~10%/yr, this drifts above the price curve over time.",
                   body: <ShareLineChart series={mcapSeries} prefix="$" height={235} />,
                 }}

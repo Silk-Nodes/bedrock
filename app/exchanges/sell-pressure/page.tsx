@@ -82,7 +82,19 @@ export default async function SellPressurePage({ searchParams }: { searchParams:
   const concentrated = top10Pct >= 50;
   const spanStart = sp.series[0] ? fmtBucket(sp.series[0].ts) : "";
   const spanEnd = sp.series[sp.series.length - 1] ? fmtBucket(sp.series[sp.series.length - 1].ts) : "";
-  const span = `${spanStart} to ${spanEnd}`;
+  // Endpoints alone would describe a continuous run even if buckets were missing
+  // between them, so say how many buckets actually back it. Today the rollups
+  // only return continuous weeks and the two agree; if the source ever gets
+  // gappy this keeps the label honest instead of quietly widening.
+  const bucketDays = sp.bucket_days || 1;
+  const spanDays = sp.series.length
+    ? Math.round((Date.parse(sp.series[sp.series.length - 1].ts) - Date.parse(sp.series[0].ts)) / 86_400_000) + bucketDays
+    : 0;
+  const expectedBuckets = Math.round(spanDays / bucketDays);
+  const contiguous = sp.series.length >= expectedBuckets;
+  const span = contiguous
+    ? `${spanStart} to ${spanEnd}`
+    : `${spanStart} to ${spanEnd} · ${sp.series.length} of ${expectedBuckets} buckets indexed`;
   const largest = sp.bursts[0]?.atom ?? 0;
   // Memo confidence: share of direct exchange deposits that carried a memo
   // (forward-only signal; null until the indexer has accrued memo'd flow).
