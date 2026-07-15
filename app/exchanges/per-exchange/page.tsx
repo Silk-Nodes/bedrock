@@ -11,7 +11,7 @@ import { AddressLink } from "@/components/address/AddressLink";
 import { Soon } from "@/components/console/Soon";
 import { LiveExchangeFeed } from "@/components/exchanges/LiveExchangeFeed";
 import { getExchangeCustody } from "@/lib/exchanges";
-import { getLabels, getExchangeNetFlow } from "@/lib/indexer";
+import { getLabels, getExchangeNetFlow, windowLabel } from "@/lib/indexer";
 import { seo } from "@/lib/seo";
 
 export const revalidate = 600;
@@ -36,8 +36,9 @@ export default async function PerExchangePage({ searchParams }: { searchParams: 
   const ex = sp?.ex ?? "";
   const dirQ = sp?.dir === "deposit" || sp?.dir === "withdrawal" ? sp.dir : "";
   const wQ = sp?.w === "24" ? 24 : sp?.w === "168" ? 168 : 720;
-  const winLabel = wQ === 24 ? "24h" : wQ === 168 ? "7d" : "~30d";
   const [custody, labelsRes, netflow] = await Promise.all([getExchangeCustody(), getLabels(), getExchangeNetFlow(wQ)]);
+  // The window the indexer aggregated, not the one the URL asked for.
+  const winLabel = windowLabel(netflow.hours);
   const flowOf = (entity: string) => netflow.rows.find((r) => r.entity === entity);
 
   if (!custody.live) {

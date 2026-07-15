@@ -18,7 +18,7 @@ import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Cons
 import { ChartCard } from "@/components/console/ChartCard";
 import { Soon } from "@/components/console/Soon";
 import { LineChart, type Series } from "@/components/charts/LineChart";
-import { getExchangeFlow, getExchangeNetFlow } from "@/lib/indexer";
+import { getExchangeFlow, getExchangeNetFlow, windowLabel } from "@/lib/indexer";
 import { getExchangeCustody } from "@/lib/exchanges";
 import { getLiveChain } from "@/lib/chain";
 import { ShareBars, ShareLineChart } from "@/components/share/ShareCharts";
@@ -52,9 +52,10 @@ export default async function Exchanges({ searchParams }: { searchParams: Promis
   const exQ = sp?.ex && ["Coinbase", "Kraken", "Binance", "Upbit", "OKX", "Coinone"].includes(sp.ex) ? sp.ex : "";
   const dirQ = sp?.dir === "deposit" || sp?.dir === "withdrawal" ? sp.dir : "";
   const wQ = sp?.w === "24" ? 24 : sp?.w === "168" ? 168 : 720;
-  const winLabel = wQ === 24 ? "24h" : wQ === 168 ? "7d" : "~30d";
 
   const [flow, custody, netflow, chain] = await Promise.all([getExchangeFlow(0), getExchangeCustody(), getExchangeNetFlow(wQ), getLiveChain()]);
+  // The window the indexer aggregated, not the one the URL asked for.
+  const winLabel = windowLabel(netflow.hours);
   const binance = flow.rows.filter((r) => r.entity === "Binance");
 
   const hasFlows = flow.live && binance.length > 0;
@@ -443,10 +444,32 @@ export default async function Exchanges({ searchParams }: { searchParams: Promis
   const lastDay = binance[binance.length - 1].day;
   const txCount = binance.reduce((s, r) => s + r.deposit_count + r.withdraw_count, 0);
 
+  // Coverage, not span. The rows run 2019-06-01 → today, but the two backfill
+  // cursors have not met yet, so barely half those days actually carry data:
+  // printing the endpoints claimed a seven-year continuous record we do not
+  // have. Derived, so it tells the truth today and again when the gap closes.
+  const dayMs = 86_400_000;
+  const spanDays = Math.round((Date.parse(lastDay) - Date.parse(firstDay)) / dayMs) + 1;
+  const indexedDays = binance.length;
+  const complete = indexedDays >= spanDays - 1;
+  // Exact counts, not fmtCompact: it is built for ATOM amounts and rounds 2,602
+  // up to "3k", which is a claim of its own in the one line whose whole job is
+  // to be precise about how much of the window is real.
+  const coverage = complete
+    ? `${firstDay} → ${lastDay}`
+    : `${firstDay} → ${lastDay} · ${indexedDays.toLocaleString("en-US")} of ${spanDays.toLocaleString("en-US")} days indexed, backfill in progress`;
+
   const series: Series[] = [
     { label: "Deposits (onto Binance)", color: "var(--iron)", points: binance.map((r) => ({ date: r.day, value: Math.round(r.deposit_atom) })) },
     { label: "Withdrawals (off Binance)", color: "var(--moss)", points: binance.map((r) => ({ date: r.day, value: Math.round(r.withdraw_atom) })) },
   ];
+
+  // The share card takes the last N ROWS, and rows are days-with-data, not
+  // calendar days. While the backfill is open those 365 rows reach back years,
+  // so the card cannot call itself "the past year": it names the window it got.
+  const SHARE_ROWS = 365;
+  const shareRows = binance.slice(-SHARE_ROWS);
+  const shareWindow = `${shareRows[0].day} → ${shareRows[shareRows.length - 1].day}`;
 
   // Per-metric daily timelines for the MetricCards, derived from the same indexed rows.
   const depositPts = binance.map((r) => ({ date: r.day, value: Math.round(r.deposit_atom) }));
@@ -466,7 +489,7 @@ export default async function Exchanges({ searchParams }: { searchParams: Promis
       <ConsoleModule
         dot="var(--iron)"
         title="Exchanges · Binance flows"
-        meta={`${firstDay} → ${lastDay} · ${fmtCompact(txCount)} transfers · from the Bedrock indexer`}
+        meta={`${coverage} · ${fmtCompact(txCount)} transfers · from the Bedrock indexer`}
       >
         {/* These are cumulative era totals (and a sign-flipping net), not
             period-over-period metrics, so the auto first-vs-last delta badge is
@@ -488,17 +511,19 @@ export default async function Exchanges({ searchParams }: { searchParams: Promis
           <div className="span-12">
             <ChartCard
               title="Daily deposits vs withdrawals · Binance"
-              meta="verified cluster · 2021 wallets + current hot wallet, chain-of-custody"
+              meta={complete
+                ? "verified cluster · 2021 wallets + current hot wallet, chain-of-custody"
+                : "verified cluster · chain-of-custody · gaps are un-indexed, not zero flow"}
               accentColor="var(--iron)"
               shareFilename="bedrock-binance-flows"
               share={{
                 title: "Binance ATOM flows · Cosmos HUB",
-                subtitle: "Daily deposits vs withdrawals over the past year, from Bedrock's own indexer",
+                subtitle: `Daily deposits vs withdrawals · ${shareWindow} · ${shareRows.length.toLocaleString("en-US")} indexed days, from Bedrock's own indexer`,
                 context: "Label-driven flows: only addresses verified by chain-of-custody and documented sources classify as exchange flow.",
-                body: <ShareLineChart series={series} unit="ATOM/day" takeLast={365} height={240} />,
+                body: <ShareLineChart series={series} unit="ATOM/day" takeLast={SHARE_ROWS} height={240} gapLabel="BACKFILL IN PROGRESS" />,
               }}
             >
-              <LineChart series={series} yLabel="ATOM / DAY" height={300} />
+              <LineChart series={series} yLabel="ATOM / DAY" height={300} gapLabel="BACKFILL IN PROGRESS" />
             </ChartCard>
           </div>
 

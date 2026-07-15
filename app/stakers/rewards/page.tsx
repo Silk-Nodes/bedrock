@@ -8,7 +8,7 @@ import { MetricCard } from "@/components/console/MetricCard";
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { Soon } from "@/components/console/Soon";
 import { AddressLink } from "@/components/address/AddressLink";
-import { getRewardClaims, getRewardBehavior, type RewardTierBehavior } from "@/lib/indexer";
+import { getRewardClaims, getRewardBehavior, spanLabel, type RewardTierBehavior } from "@/lib/indexer";
 import { TipCard } from "@/components/charts/TipCard";
 import { ShareStack } from "@/components/share/ShareCharts";
 import { seo } from "@/lib/seo";
@@ -89,7 +89,16 @@ export default async function StakersRewards() {
     <ConsolePage>
       <ConsoleModule lead dot="var(--moss)" title="Stakers · Rewards" meta="claims & post-claim behavior · live from the indexer">
         <div className="console-grid">
-          {/* Thesis lede */}
+          {/* Thesis lede.
+
+              "30 days" here is the one window label left on the site that cannot
+              be derived: RewardBehavior carries no window fields, so the indexer
+              names the w30d bucket and this page can only take its word. It is
+              accurate today (the tip follower covers well over 30 days), but
+              nothing here could detect it going partial. The fix belongs in the
+              API contract: return window_start/window_end alongside the buckets,
+              as reward-claims and validators/flow already do, then derive this
+              the way every other label now does. */}
           <div className="span-12">
             <IntelCard title="What stakers do with their rewards" meta="last 30 days · post-claim behavior" accent>
               <p style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-80)", margin: 0 }}>
@@ -158,7 +167,7 @@ export default async function StakersRewards() {
           {/* Top claimants (existing view, kept) */}
           {claims.live && claims.top.length > 0 && (
             <div className="span-12">
-              <IntelCard title="Top claimants" meta={`last 7d · ${fmtCompact(top12Atom)} ATOM across the top ${claims.top.length}`}>
+              <IntelCard title="Top claimants" meta={`last ${spanLabel(claims.window_start, claims.window_end)} · ${fmtCompact(top12Atom)} ATOM across the top ${claims.top.length}`}>
                 <table className="broadsheet">
                   <thead><tr><th>Wallet</th><th style={{ textAlign: "right" }}>Claimed</th><th style={{ textAlign: "right" }}>Claims</th></tr></thead>
                   <tbody>

@@ -59,6 +59,8 @@ function usd(n: number): string {
   return `$${Math.round(n)}`;
 }
 
+const HOLDER_ROWS = 50;  // rows the table renders; the label must match the screen
+
 export default async function HoldersPage() {
   const [h, market, chain] = await Promise.all([getHolders(), getLiveAtomMarket(), getLiveChain()]);
   const price = market.usd || 0;
@@ -298,7 +300,7 @@ export default async function HoldersPage() {
           {/* Leaderboard */}
           {h.top.length > 0 && (
             <div className="span-12">
-              <IntelCard title="Largest holders" meta={`top ${h.top.length} by combined balance · liquid + staked`}>
+              <IntelCard title="Largest holders" meta={`top ${Math.min(HOLDER_ROWS, h.top.length)} by combined balance · liquid + staked`}>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>
@@ -311,7 +313,7 @@ export default async function HoldersPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {h.top.slice(0, 50).map((t) => {
+                      {h.top.slice(0, HOLDER_ROWS).map((t) => {
                         const stakedPct = t.atom > 0 ? (t.staked_atom / t.atom) * 100 : 0;
                         const share = L.total_atom > 0 ? (t.atom / L.total_atom) * 100 : 0;
                         return (

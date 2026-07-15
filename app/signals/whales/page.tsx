@@ -10,17 +10,20 @@ import { ValidatorLink } from "@/components/validator/ValidatorLink";
 import { ValidatorAvatar } from "@/components/console/ValidatorAvatar";
 import { Soon } from "@/components/console/Soon";
 import { WhaleWindow } from "@/components/signals/WhaleWindow";
-import { getFlowFeed, getStakingRecent, getSellPressure } from "@/lib/indexer";
+import { getFlowFeed, getStakingRecent, getSellPressure, windowLabel } from "@/lib/indexer";
 import { getLiveValidators, getValidatorLogoMap } from "@/lib/validators";
 import { seo } from "@/lib/seo";
 
 // Time window for the two intel cards (depositors + largest transfers), driven
 // by the ?w query (hours). 30D is the default and the current depth of indexed
 // exchange history; longer ranges open up as the backfill deepens.
-function resolveWindow(w: string): { days: number; hours: number; label: string } {
-  if (w === "24") return { days: 1, hours: 24, label: "24h" };
-  if (w === "168") return { days: 7, hours: 168, label: "7d" };
-  return { days: 30, hours: 720, label: "30d" };
+// No `label` here on purpose: this resolves what we ASK the indexer for, and a
+// ready-made label sitting next to it is what got reused as if it described the
+// answer. Labels are derived from the returned data below.
+function resolveWindow(w: string): { days: number; hours: number } {
+  if (w === "24") return { days: 1, hours: 24 };
+  if (w === "168") return { days: 7, hours: 168 };
+  return { days: 30, hours: 720 };
 }
 
 export const revalidate = 30;
@@ -88,13 +91,28 @@ function StakeTable({ title, rows, accent, verb }: { title: string; rows: StakeR
 
 export default async function SignalsWhales({ searchParams }: { searchParams: Promise<{ w?: string }> }) {
   const win = resolveWindow((await searchParams)?.w ?? "");
+  const FEED_LIMIT = 250;
   const [{ flows, live }, staking, sp, vals, logos] = await Promise.all([
-    getFlowFeed({ minAtom: 10000, limit: 250, hours: win.hours }),
+    getFlowFeed({ minAtom: 10000, limit: FEED_LIMIT, hours: win.hours }),
     getStakingRecent(1000, 200),
     getSellPressure(win.days, win.days >= 30 ? 7 : 1),
     getLiveValidators(0),
     getValidatorLogoMap(),
   ]);
+
+  // Both labels below name what came back, not what ?w= asked for.
+  //
+  // The feed is capped at FEED_LIMIT rows, newest first, so during a busy spell
+  // it can run out well before the window does. When the cap is hit we only saw
+  // back to the oldest row; when it is not, we saw the whole window.
+  const feedCapped = flows.length >= FEED_LIMIT;
+  const feedOldest = flows.length ? Math.min(...flows.map((f) => new Date(f.time).getTime())) : Date.now();
+  const feedLabel = feedCapped ? windowLabel((Date.now() - feedOldest) / 3600_000) : windowLabel(win.hours);
+
+  // Sell pressure returns whole buckets only, so its real depth is the buckets
+  // it returned, which is fewer than requested while the backfill is open.
+  const spDays = sp.series.length * (sp.bucket_days || 1);
+  const spLabel = spDays > 0 ? windowLabel(spDays * 24) : "no window";
 
   const metaByOper = new Map(vals.validators.map((v) => [v.operator, v.moniker]));
   const label = (oper: string) => metaByOper.get(oper) ?? `${oper.slice(0, 14)}…`;
@@ -124,7 +142,7 @@ export default async function SignalsWhales({ searchParams }: { searchParams: Pr
       <ConsoleModule lead dot="var(--hub-2)" title="Signals · Whales" meta="biggest movers · live from the indexer">
         <div className="console-grid">
           <div className="span-4"><MetricCard label="Largest transfer" value={fmtCompact(largest)} unit="ATOM" series={[]} color="var(--hub)" footnote="biggest single flow" /></div>
-          <div className="span-4"><MetricCard label="Whale moves" value={String(flows.length)} series={[]} color="var(--hub-2)" footnote={`≥ 10k ATOM · last ${win.label}`} /></div>
+          <div className="span-4"><MetricCard label="Whale moves" value={String(flows.length)} series={[]} color="var(--hub-2)" footnote={`≥ 10k ATOM · last ${feedLabel}`} /></div>
           <div className="span-4"><MetricCard label="Avg move" value={fmtCompact(avg)} unit="ATOM" series={[]} color="var(--sand)" footnote="mean captured size" /></div>
 
           {!anything && (
@@ -150,7 +168,7 @@ export default async function SignalsWhales({ searchParams }: { searchParams: Pr
           {/* Biggest exchange depositors (sell-intent), from the sell-pressure rollup */}
           {sp.top_senders.length > 0 && (
             <div className="span-6">
-              <IntelCard title="Biggest exchange depositors" meta={`sell-intent · last ${win.label}`}>
+              <IntelCard title="Biggest exchange depositors" meta={`sell-intent · last ${spLabel}`}>
                 <table className="broadsheet mcols-3">
                   <thead>
                     <tr><th style={{ width: 28 }}>#</th><th>Wallet</th><th style={{ textAlign: "right" }} className="mhide3">Deposits</th><th style={{ textAlign: "right" }}>ATOM</th></tr>
@@ -173,7 +191,7 @@ export default async function SignalsWhales({ searchParams }: { searchParams: Pr
           {/* Largest transfers */}
           {top.length > 0 && (
             <div className="span-6">
-              <IntelCard title="Largest transfers" meta={`≥ 10k ATOM · last ${win.label}`}>
+              <IntelCard title="Largest transfers" meta={`≥ 10k ATOM · last ${feedLabel}`}>
                 <table className="broadsheet mcols-3">
                   <thead>
                     <tr><th style={{ width: 44 }}>Ago</th><th>From</th><th>To</th><th style={{ textAlign: "right" }}>ATOM</th></tr>
