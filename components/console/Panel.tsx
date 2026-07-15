@@ -11,9 +11,10 @@ import type { ReactNode } from "react";
 import { Sparkline } from "@/components/charts/Sparkline";
 import { CountUp } from "@/components/console/CountUp";
 import { ShareButton } from "@/components/share/ShareButton";
+import { stampCard } from "@/components/share/stampCard";
 import type { SocialCardProps } from "@/components/share/SocialCard";
 
-export function Panel({
+export async function Panel({
   label,
   meta,
   number,
@@ -168,11 +169,12 @@ export function Panel({
 
   // When shareable, wrap so the camera sits ABOVE the link (button-in-anchor is invalid).
   if (share) {
+    const shareCard = await stampCard(share);
     return (
       <div className="share-host" style={{ position: "relative", height: "100%" }}>
         {inner}
         <span style={{ position: "absolute", top: 8, right: 8, zIndex: 2 }}>
-          <ShareButton reveal card={share} filename={shareFilename} />
+          <ShareButton reveal card={shareCard} filename={shareFilename} />
         </span>
       </div>
     );

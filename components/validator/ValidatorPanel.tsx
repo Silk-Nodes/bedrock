@@ -16,6 +16,7 @@ type Flow7 = { net: number; delegate: number; unbond: number; start: string | nu
 type ValData = {
   operator: string;
   live: boolean;
+  block?: number;      // height the route read this validator at; stamped on the card
   moniker?: string;
   logo?: string | null;
   rank?: number;
@@ -106,6 +107,7 @@ export function ValidatorPanel() {
             data.commission_pct != null ? `${data.commission_pct}% commission.` : null,
             data.flow7 ? `${fmtSigned(data.flow7.net)} ATOM net delegation over ${flowSpan}.` : null,
           ].filter(Boolean).join("  "),
+          blockHeight: data.block,
         }
       : null;
 

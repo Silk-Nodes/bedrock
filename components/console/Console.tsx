@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { ShareButton } from "@/components/share/ShareButton";
+import { stampCard } from "@/components/share/stampCard";
 import type { SocialCardProps } from "@/components/share/SocialCard";
 
 // Standard page wrapper for every console. Same padding rhythm everywhere.
@@ -219,7 +220,7 @@ export function ConsoleHeader({
   );
 }
 
-export function IntelCard({
+export async function IntelCard({
   title,
   meta,
   accent = false,
@@ -234,6 +235,7 @@ export function IntelCard({
   shareFilename?: string;
   children: React.ReactNode;
 }) {
+  const shareCard = await stampCard(share);
   return (
     <div
       className={`surface${accent ? " is-accent" : ""}${share ? " share-host" : ""}`}
@@ -275,7 +277,7 @@ export function IntelCard({
               {meta}
             </span>
           )}
-          {share && <ShareButton reveal card={share} filename={shareFilename} />}
+          {shareCard && <ShareButton reveal card={shareCard} filename={shareFilename} />}
         </span>
       </div>
       {/* Children container grows to the card's remaining height so a child
