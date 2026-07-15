@@ -4,6 +4,18 @@ Notable changes to the Bedrock web app. The methodology changelog — how a numb
 is *defined* — lives at
 [bedrock.silknodes.io/methodology#changelog](https://bedrock.silknodes.io/methodology#changelog).
 
+## [Unreleased]
+
+### Changed
+- **Snapshot cards stamp the block they were built from.** Cards carry
+  `BLOCK 32,043,284` rather than `EXPORTED 15 Jul 2026` wherever the indexer is
+  reachable: a block is a receipt a reader can go and check, a date is only a
+  timestamp. The height is read on the server in the same render as the card's
+  data and never at export time, so a tab left open for three hours cannot stamp
+  a block its charts never saw. It reports what the tip follower has actually
+  indexed, not the chain tip it is chasing. Cards still fall back to the export
+  date when the indexer is unreachable, rather than stamping `BLOCK 0`.
+
 ## [0.1.0] — 2026-07-15
 
 Initial public release. Beta: history is still backfilling, labels are still

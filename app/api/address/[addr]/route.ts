@@ -3,7 +3,7 @@
 // unbonding entries, and claimable rewards. Read live from Cosmos REST.
 
 import { getLiveAtomPrice } from "@/lib/price";
-import { getAddressActivity, getAddressSummary, getLabels, getWalletFlowClass } from "@/lib/indexer";
+import { getAddressActivity, getAddressSummary, getLabels, getShareBlock, getWalletFlowClass } from "@/lib/indexer";
 
 const HOSTS = ["https://cosmos-rest.publicnode.com", "https://rest.cosmos.directory/cosmoshub"];
 
@@ -25,7 +25,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ addr: string }
     return Response.json({ error: "invalid address" }, { status: 400 });
   }
 
-  const [bal, dels, unb, rew, price, activity, labelsRes, summaryRes, flowClass] = await Promise.all([
+  const [bal, dels, unb, rew, price, activity, labelsRes, summaryRes, flowClass, block] = await Promise.all([
     jget(`/cosmos/bank/v1beta1/balances/${addr}`),
     jget(`/cosmos/staking/v1beta1/delegations/${addr}`),
     jget(`/cosmos/staking/v1beta1/delegators/${addr}/unbonding_delegations`),
@@ -35,6 +35,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ addr: string }
     getLabels(),
     getAddressSummary(addr),
     getWalletFlowClass(addr, 180),
+    getShareBlock(),  // stamped on the panel's exported card
   ]);
 
   if (!bal && !dels) {
@@ -216,6 +217,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ addr: string }
   return Response.json({
     address: addr,
     live: true,
+    block,
     price_usd: price.usd,
     total_atom: Math.round(total),
     total_usd: Math.round(total * price.usd),

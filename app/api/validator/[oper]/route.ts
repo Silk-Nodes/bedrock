@@ -4,7 +4,7 @@
 // validator set and the validators/flow aggregate.
 
 import { getLiveValidators, getValidatorLogoMap } from "@/lib/validators";
-import { getValidatorFlow } from "@/lib/indexer";
+import { getShareBlock, getValidatorFlow } from "@/lib/indexer";
 import { getLiveAtomPrice } from "@/lib/price";
 
 export const revalidate = 120;
@@ -15,12 +15,13 @@ export async function GET(_req: Request, ctx: { params: Promise<{ oper: string }
     return Response.json({ error: "invalid operator" }, { status: 400 });
   }
 
-  const [set, flow7, flow24, price, logos] = await Promise.all([
+  const [set, flow7, flow24, price, logos, block] = await Promise.all([
     getLiveValidators(0), // cached core: rank, voting power, commission, uptime
     getValidatorFlow(168, 500),
     getValidatorFlow(24, 500),
     getLiveAtomPrice(),
     getValidatorLogoMap(), // server-resolved keybase logo, cached
+    getShareBlock(),       // stamped on the panel's exported card
   ]);
 
   const v = set.validators.find((x) => x.operator === oper);
@@ -35,6 +36,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ oper: string }
   return Response.json({
     operator: oper,
     live: true,
+    block,
     moniker: v.moniker,
     logo: logos[oper] ?? null,
     rank: v.rank,

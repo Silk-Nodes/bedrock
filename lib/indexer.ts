@@ -2,6 +2,8 @@
 // Falls back gracefully ({ live: false }) when the indexer is unreachable, e.g.
 // in local dev where 127.0.0.1:8080 is not the VM.
 
+import { unstable_cache } from "next/cache";
+
 const INDEXER_URL = process.env.BEDROCK_INDEXER_URL || "http://127.0.0.1:8080";
 
 export type ActivityEvent = {
@@ -169,6 +171,48 @@ export async function getIndexerStatus(): Promise<IndexerStatus> {
   } catch {
     return empty;
   }
+}
+
+// Height stamped on exported share cards.
+//
+// Two rules shape this. First, the stamp is read on the server in the same
+// render as the card's data, never at export time: a tab left open for three
+// hours would otherwise stamp a block its charts never saw. Second, it reports
+// what the tip follower has actually INDEXED, not the chain tip it is chasing,
+// because the site cannot show a block it has not read yet.
+//
+// It is deliberately not routed through getIndexerStatus(). That helper reads
+// on a 60s clock, and Next pins a route to the LOWEST revalidate among its
+// reads, which is why /methodology sits at 1m. Reusing it drags every page
+// holding a card down with it: measured, it took /signals/cohorts from 10m to
+// 1m and seven others to 1m, re-running their queries ten times more often to
+// print a watermark. The 600s below is not a freshness preference, it is the
+// largest window any card-bearing page uses (cohorts and market/relative), so
+// min() leaves all of them exactly as their authors tuned them. Raising a
+// page's own revalidate above 600 would silently pull it down to 600; if that
+// happens, raise this to match rather than let the page drift.
+//
+// The cost is that the stamp can trail the data by up to one cache window. It
+// trails rather than leads, which is the safe direction: the card trues up to a
+// block the site had definitely indexed, never one it had not reached yet.
+async function fetchShareBlock(): Promise<number> {
+  try {
+    const res = await fetch(`${INDEXER_URL}/api/v1/status`, { cache: "no-store" });
+    if (!res.ok) return 0;
+    const j = (await res.json()) as { tip_follower?: { last_indexed_height?: number } };
+    return j.tip_follower?.last_indexed_height ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+const cachedShareBlock = unstable_cache(fetchShareBlock, ["share-block-v1"], { revalidate: 600 });
+
+/** Undefined when the indexer is unreachable, so cards fall back to the export
+ *  date rather than stamping BLOCK 0. */
+export async function getShareBlock(): Promise<number | undefined> {
+  const h = await cachedShareBlock();
+  return h > 0 ? h : undefined;
 }
 
 export type RewardClaimant = { address: string; total_atom: number; count: number };

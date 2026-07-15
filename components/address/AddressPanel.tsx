@@ -18,6 +18,7 @@ type Unb = { validator: string; oper: string; atom: number; completion: string }
 type AddrData = {
   address: string;
   live: boolean;
+  block?: number;      // height the route read this position at; stamped on the card
   total_atom?: number;
   total_usd?: number;
   staked?: number;
@@ -164,6 +165,7 @@ export function AddressPanel() {
           ]
             .filter(Boolean)
             .join("  "),
+          blockHeight: data.block,
         }
       : null;
 

@@ -5,9 +5,10 @@
 // and secondary charts in the hl.eco layout grammar.
 
 import { ShareButton } from "@/components/share/ShareButton";
+import { stampCard } from "@/components/share/stampCard";
 import type { SocialCardProps } from "@/components/share/SocialCard";
 
-export function ChartCard({
+export async function ChartCard({
   title,
   meta,
   value,
@@ -26,6 +27,7 @@ export function ChartCard({
   shareFilename?: string;
   children: React.ReactNode;
 }) {
+  const shareCard = await stampCard(share);
   return (
     <div
       className={`surface${share ? " share-host" : ""}`}
@@ -41,7 +43,7 @@ export function ChartCard({
           {meta && (
             <span className="data" style={{ fontSize: 9.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--ink-40)" }}>{meta}</span>
           )}
-          {share && <ShareButton reveal card={share} filename={shareFilename} />}
+          {shareCard && <ShareButton reveal card={shareCard} filename={shareFilename} />}
         </span>
       </div>
       <div>{children}</div>
