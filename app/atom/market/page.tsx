@@ -11,7 +11,7 @@ import { LineChart, type Series } from "@/components/charts/LineChart";
 import { ATOM_TOKEN } from "@/data/atom";
 import { getLiveAtomMarket, getAtomMarketChart } from "@/lib/price";
 import { spanLabel } from "@/lib/indexer";
-import { ShareLineChart, ShareRange } from "@/components/share/ShareCharts";
+import { ShareLineChart, ShareRange, ShareBars } from "@/components/share/ShareCharts";
 import { seo } from "@/lib/seo";
 
 export const revalidate = 300;
@@ -135,7 +135,15 @@ export default async function AtomMarket() {
             </ChartCard>
           </div>
           <div className="span-4">
-            <IntelCard title="Snapshot" meta="live market">
+            <IntelCard title="Snapshot" meta="live market" shareFilename="bedrock-atom-snapshot"
+              share={{
+                title: "ATOM market snapshot · Cosmos HUB",
+                subtitle: "Live market cap, volume and 52-week range",
+                big: fmtUsd(m.mcap_usd), unit: "market cap",
+                delta: `${ch24 >= 0 ? "+" : ""}${ch24.toFixed(1)}% · 24h`,
+                context: `24h volume ${fmtUsd(m.volume_24h_usd)} · turnover ${turnoverPct.toFixed(1)}% · ${fmtAtom(m.circulating)} ATOM circulating. ATOM has no max supply, so circulating equals total.`,
+                body: <ShareRange low={lo52} high={hi52} value={m.usd} fmt={fmtUsd} lowLabel="52w low" highLabel="52w high" />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <Fact label="Market cap" value={fmtUsd(m.mcap_usd)} accent="var(--hub-2)" />
                 <Fact label="24h volume" value={fmtUsd(m.volume_24h_usd)} accent="var(--sand)" />
@@ -169,7 +177,17 @@ export default async function AtomMarket() {
             </ChartCard>
           </div>
           <div className="span-4">
-            <IntelCard title="Valuation" meta="vs history">
+            <IntelCard title="Valuation" meta="vs history" shareFilename="bedrock-atom-valuation"
+              share={{
+                title: "ATOM valuation vs history · Cosmos HUB",
+                subtitle: "Distance from the all-time high and the 52-week low",
+                big: `${m.ath_change_pct.toFixed(0)}%`, unit: "below the all-time high",
+                context: `ATH ${fmtUsd(m.ath)}${m.ath_date ? ` on ${m.ath_date}` : ""} · ${athMultiple.toFixed(1)}× from here · ${aboveLowPct.toFixed(0)}% above the 52-week low · ${genesisMultiple.toFixed(0)}× the $${ATOM_TOKEN.genesis_price_usd.toFixed(2)} ICO price.`,
+                body: <ShareBars unit="" rows={[
+                  { label: "Below ATH", value: Math.abs(m.ath_change_pct), display: `${m.ath_change_pct.toFixed(0)}%`, color: "var(--iron)" },
+                  { label: "Above 52w low", value: aboveLowPct, display: `+${aboveLowPct.toFixed(0)}%`, color: "var(--moss)" },
+                ]} />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <Fact label="Below all-time high" value={`${m.ath_change_pct.toFixed(0)}%`} accent="var(--iron)" />
                 <Fact label="All-time high" value={m.ath_date ? `${fmtUsd(m.ath)} · ${m.ath_date}` : fmtUsd(m.ath)} />

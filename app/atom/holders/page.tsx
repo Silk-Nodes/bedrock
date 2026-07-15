@@ -7,6 +7,7 @@
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { LineChart, type Series } from "@/components/charts/LineChart";
 import { StatCard } from "@/components/console/StatCard";
+import { ShareBars } from "@/components/share/ShareCharts";
 import { AddressLink } from "@/components/address/AddressLink";
 import { HoverTip } from "@/components/HoverTip";
 import { getHolders, type HolderSnap } from "@/lib/indexer";
@@ -200,7 +201,14 @@ export default async function HoldersPage() {
 
           {/* Tier breakdown table */}
           <div className="span-12">
-            <IntelCard title="Tier breakdown" meta="holders at each balance threshold">
+            <IntelCard title="Tier breakdown" meta="holders at each balance threshold" shareFilename="bedrock-holder-tiers"
+              share={{
+                title: "ATOM holders by tier · Cosmos HUB",
+                subtitle: `Wallets at each balance threshold · as of ${L.day}`,
+                big: compact(L.holders_total), unit: "wallets",
+                context: "Liquid and staked combined per wallet, from Bedrock's own daily holder snapshot.",
+                body: <ShareBars unit="wallets" rows={[...TIERS].reverse().map((t) => ({ label: t.label, value: L.tiers[t.key], display: fmt(L.tiers[t.key]) }))} />,
+              }}>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
@@ -234,7 +242,14 @@ export default async function HoldersPage() {
 
           {/* Holder pyramid */}
           <div className="span-6">
-            <IntelCard title="Holder pyramid" meta="wallets in each balance band">
+            <IntelCard title="Holder pyramid" meta="wallets in each balance band" shareFilename="bedrock-holder-pyramid"
+              share={{
+                title: "The ATOM holder pyramid · Cosmos HUB",
+                subtitle: `Wallets in each balance band · as of ${L.day}`,
+                big: fmt(bandedTotal), unit: "wallets in bands",
+                context: `Dust under 10 ATOM is excluded (${compact(L.bands.dust)} wallets). Liquid and staked combined.`,
+                body: <ShareBars unit="wallets" rows={BANDS.map((b) => ({ label: b.label, value: L.bands[b.key], color: b.color, display: fmt(L.bands[b.key]) }))} />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {BANDS.map((b) => {
                   const n = L.bands[b.key];
@@ -258,7 +273,14 @@ export default async function HoldersPage() {
 
           {/* Concentration */}
           <div className="span-6">
-            <IntelCard title="Concentration" meta="share of all held ATOM">
+            <IntelCard title="Concentration" meta="share of all held ATOM" shareFilename="bedrock-holder-concentration"
+              share={{
+                title: "ATOM concentration · Cosmos HUB",
+                subtitle: `Share of all held ATOM · as of ${L.day}`,
+                big: `${top100Pct.toFixed(1)}%`, unit: "held by the top 100",
+                context: `Of ${compact(L.total_atom)} ATOM across ${fmt(L.holders_total)} wallets${L.gini != null ? ` · Gini ${L.gini.toFixed(2)}` : ""}.`,
+                body: <ShareBars unit="" rows={[{ label: "Top 10", value: top10Pct, display: `${top10Pct.toFixed(1)}%` }, { label: "Top 50", value: top50Pct, display: `${top50Pct.toFixed(1)}%` }, { label: "Top 100", value: top100Pct, display: `${top100Pct.toFixed(1)}%` }]} />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {[
                   { label: "Top 10 wallets", pct: top10Pct, atom: L.top10_atom, color: "var(--iron)" },
@@ -300,7 +322,14 @@ export default async function HoldersPage() {
           {/* Leaderboard */}
           {h.top.length > 0 && (
             <div className="span-12">
-              <IntelCard title="Largest holders" meta={`top ${Math.min(HOLDER_ROWS, h.top.length)} by combined balance · liquid + staked`}>
+              <IntelCard title="Largest holders" meta={`top ${Math.min(HOLDER_ROWS, h.top.length)} by combined balance · liquid + staked`} shareFilename="bedrock-largest-holders"
+                share={{
+                  title: "Largest ATOM holders · Cosmos HUB",
+                  subtitle: `Top ${Math.min(HOLDER_ROWS, h.top.length)} by combined balance · as of ${L.day}`,
+                  big: compact(L.top10_atom), unit: "ATOM in the top 10",
+                  context: "Liquid and staked per wallet, from Bedrock's own daily snapshot.",
+                  body: <ShareBars rows={h.top.slice(0, 8).map((t) => ({ label: short(t.address), value: t.atom, note: t.atom > 0 ? `· ${((t.staked_atom / t.atom) * 100).toFixed(0)}% staked` : undefined }))} />,
+                }}>
                 <div style={{ overflowX: "auto" }}>
                   <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                     <thead>

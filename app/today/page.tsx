@@ -7,6 +7,7 @@ import Link from "next/link";
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { HappeningFeed } from "@/components/today/HappeningFeed";
 import { LineChart } from "@/components/charts/LineChart";
+import { ShareLineChart, ShareBars, ShareColumns } from "@/components/share/ShareCharts";
 import { WeeklyFlowChart } from "@/components/charts/WeeklyFlowChart";
 import { getTodayFeed } from "@/lib/todayFeed";
 import { getLiveChain } from "@/lib/chain";
@@ -104,7 +105,14 @@ export default async function Console() {
 
           {/* ── Hero row: price + staking economy ── */}
           <div className="span-6">
-            <IntelCard title="ATOM price" meta={`${priceDays} days · daily close`}>
+            <IntelCard title="ATOM price" meta={`${priceDays} days · daily close`} shareFilename="bedrock-today-price"
+              share={{
+                title: "ATOM price · Cosmos HUB",
+                subtitle: `Daily close · ${priceDays} indexed days`,
+                big: `$${price.usd.toFixed(2)}`, unit: "USD",
+                context: `High $${hi.toFixed(2)} · low $${lo.toFixed(2)} · market cap ${fmt(price.mcap_usd)}. Live from CoinGecko.`,
+                body: <ShareLineChart series={[{ label: "ATOM/USD", color: "var(--hub)", points: hist.points }]} prefix="$" height={235} />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
               <div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4 }}>
@@ -121,7 +129,14 @@ export default async function Console() {
           </div>
 
           <div className="span-6">
-            <IntelCard title="Staking economy" meta={`live params · daily reward claims, ${rewardDays}d`}>
+            <IntelCard title="Staking economy" meta={`live params · daily reward claims, ${rewardDays}d`} shareFilename="bedrock-today-staking"
+              share={{
+                title: "ATOM staking economy · Cosmos HUB",
+                subtitle: `Live params · daily reward claims over ${rewardDays} indexed days`,
+                big: `${chain.staking_apr_pct.toFixed(1)}%`, unit: "staking APR",
+                context: `${chain.bonded_ratio_pct.toFixed(1)}% of supply bonded · inflation ${chain.inflation_pct.toFixed(1)}%. Peak claim day ${fmt(peakReward.atom)} ATOM.`,
+                body: <ShareLineChart series={[{ label: "Claimed", color: "var(--moss)", points: rewards.points.map((r) => ({ date: r.day, value: r.atom })) }]} unit="ATOM/day" height={235} />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
               <div>
               <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4 }}>
@@ -145,7 +160,14 @@ export default async function Console() {
 
           {/* ── Flows row ── */}
           <div className="span-4">
-            <IntelCard title="Net exchange flow" meta="weekly · buy − sell">
+            <IntelCard title="Net exchange flow" meta="weekly · buy − sell" shareFilename="bedrock-today-netflow"
+              share={{
+                title: "Net exchange flow · Cosmos HUB",
+                subtitle: `Weekly, withdrawn minus deposited · ${flows.weeks.length} indexed week${flows.weeks.length === 1 ? "" : "s"}`,
+                big: fmtSigned(flows.netExchange), unit: "ATOM",
+                context: "Withdrawals minus deposits across verified exchange wallets, netted per wallet. A deposit is sell intent, not a confirmed sale.",
+                body: <ShareColumns points={flows.weeks.map((w) => ({ label: fmtWeek(w.week), value: w.netExchange }))} unit="ATOM" />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
                 <span style={{ ...BIG, fontSize: 28, color: flows.netExchange >= 0 ? "var(--moss)" : "var(--iron)" }}>{fmtSigned(flows.netExchange)}</span>
@@ -164,7 +186,15 @@ export default async function Console() {
           </div>
 
           <div className="span-4">
-            <IntelCard title="Accumulation vs distribution" meta="weekly net stance">
+            <IntelCard title="Accumulation vs distribution" meta="weekly net stance" shareFilename="bedrock-today-stance"
+              share={{
+                title: "Accumulation vs distribution · Cosmos HUB",
+                subtitle: `Weekly net stance · ${flows.weeks.length} indexed week${flows.weeks.length === 1 ? "" : "s"}`,
+                big: fmtSigned(flows.net), unit: "ATOM",
+                delta: flows.net >= 0 ? "net accumulation" : "net distribution",
+                context: "Net exchange flow plus net staking, netted per wallet so router churn cancels. Above zero, the holder base accumulated.",
+                body: <ShareColumns points={flows.weeks.map((w) => ({ label: fmtWeek(w.week), value: w.net }))} unit="ATOM" />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
                 <span style={{ ...BIG, fontSize: 28, color: flows.net >= 0 ? "var(--moss)" : "var(--iron)" }}>{fmtSigned(flows.net)}</span>
@@ -180,7 +210,14 @@ export default async function Console() {
           </div>
 
           <div className="span-4">
-            <IntelCard title="Unbonding queue" meta="completing · next 7 days">
+            <IntelCard title="Unbonding queue" meta="completing · next 7 days" shareFilename="bedrock-today-unbonding"
+              share={{
+                title: "ATOM unbonding queue · Cosmos HUB",
+                subtitle: `Completing unbond · next ${sched7.length} days`,
+                big: fmt(undel.completing_7d_atom), unit: "ATOM",
+                context: `Of ${fmt(undel.total_atom)} ATOM in the 21-day queue. Unbonding is an exit from staking, not a sale.`,
+                body: <ShareColumns points={sched7.map((d) => ({ label: d.date.slice(5), value: d.value }))} unit="ATOM" />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
                 <span style={{ ...BIG, fontSize: 28 }}>{fmt(undel.completing_7d_atom)}</span>
@@ -197,7 +234,13 @@ export default async function Console() {
 
           {/* ── Pulse row ── */}
           <div className="span-4">
-            <IntelCard title="Governance" meta={voting ? "voting now" : "latest proposals"}>
+            <IntelCard title="Governance" meta={voting ? "voting now" : "latest proposals"} shareFilename="bedrock-today-governance"
+              share={{
+                title: "Cosmos Hub governance",
+                subtitle: voting ? "Proposals voting now" : "Latest proposals",
+                context: "Yes share of votes cast, live on-chain. Scam proposals filtered out.",
+                body: <ShareBars unit="" rows={govItems.map((g) => ({ label: `#${g.id} ${g.title}`, value: g.yesPct, display: `${g.yesPct.toFixed(0)}% yes`, note: `· ${g.statusLabel}` }))} />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {govItems.map((p) => (
@@ -221,7 +264,15 @@ export default async function Console() {
           </div>
 
           <div className="span-4">
-            <IntelCard title={`Exchange netflow · ${netflowLabel}`} meta="per exchange · deposits − withdrawals">
+            <IntelCard title={`Exchange netflow · ${netflowLabel}`} meta="per exchange · deposits − withdrawals" shareFilename="bedrock-today-exchange-netflow"
+              share={{
+                title: "Exchange netflow · Cosmos HUB",
+                subtitle: `Per exchange, deposits minus withdrawals · ${netflowLabel}`,
+                big: fmtSigned(netTotal), unit: "ATOM",
+                delta: netTotal <= 0 ? "leaving exchanges" : "onto exchanges",
+                context: "Verified hot wallets only. A deposit is sell intent, not a confirmed sale.",
+                body: <ShareBars diverging unit="ATOM" positiveColor="var(--moss)" negativeColor="var(--iron)" rows={movers.map((m) => ({ label: m.entity, value: -m.net_atom }))} />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
                 <span style={{ ...BIG, fontSize: 28, color: netTotal <= 0 ? "var(--moss)" : "var(--iron)" }}>{fmtSigned(netTotal)}</span>
@@ -251,7 +302,13 @@ export default async function Console() {
           </div>
 
           <div className="span-4">
-            <IntelCard title="Validator momentum" meta={`net delegation · last ${valflowSpan}`}>
+            <IntelCard title="Validator momentum" meta={`net delegation · last ${valflowSpan}`} shareFilename="bedrock-today-validator-momentum"
+              share={{
+                title: "Validator momentum · Cosmos HUB",
+                subtitle: `Net delegation · last ${valflowSpan}`,
+                context: "Which validators gained and lost stake over the window the indexer actually covers.",
+                body: <ShareBars diverging unit="ATOM" positiveColor="var(--moss)" negativeColor="var(--iron)" rows={[...gainers, ...losers].map((r) => ({ label: vname(r.validator), value: r.net_atom }))} />,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
                 <div className="data" style={{ fontSize: 9.5, letterSpacing: "0.09em", textTransform: "uppercase", color: "var(--moss)" }}>Gaining</div>

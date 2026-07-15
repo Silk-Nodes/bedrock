@@ -13,7 +13,7 @@ import { WeeklyFlowChart } from "@/components/charts/WeeklyFlowChart";
 import { SellPressureDisclaimer } from "@/components/exchanges/SellPressureDisclaimer";
 import { TipCard } from "@/components/charts/TipCard";
 import { getCohortFlows, getCohortSellPressure } from "@/lib/indexer";
-import { ShareBars, ShareColumns } from "@/components/share/ShareCharts";
+import { ShareBars, ShareColumns, ShareLineChart } from "@/components/share/ShareCharts";
 import { seo } from "@/lib/seo";
 
 export const revalidate = 600;
@@ -236,7 +236,13 @@ export default async function CohortsPage() {
         <ConsoleModule dot="var(--iron)" title="Detail · Sell-pressure attribution" meta="likelihood-weighted exchange-bound flow, by cohort">
           <div className="console-grid">
             <div className="span-4">
-              <IntelCard title="Sell pressure by cohort" meta="share of weighted exchange-bound flow">
+              <IntelCard title="Sell pressure by cohort" meta="share of weighted exchange-bound flow" shareFilename="bedrock-sell-pressure-cohort"
+                share={{
+                  title: "Sell pressure by cohort · Cosmos HUB",
+                  subtitle: `Share of weighted exchange-bound ATOM flow · ${c.weeks.length} indexed week${c.weeks.length === 1 ? "" : "s"}`,
+                  context: "One-sided: outflow only, weighted by likelihood (direct deposit ×0.95, IBC-out with a swap memo ×1.00, without ×0.25). Sell intent, not confirmed sales.",
+                  body: <ShareBars rows={spOrder.map((co) => ({ label: SP[co]?.label ?? co, value: spTotals.get(co)?.weighted ?? 0, color: SP[co]?.color, note: `· ${(spTotals.get(co)?.pct ?? 0).toFixed(0)}%` }))} />,
+                }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {spOrder.map((co) => {
                     const t = spTotals.get(co);
@@ -258,7 +264,17 @@ export default async function CohortsPage() {
               </IntelCard>
             </div>
             <div className="span-8">
-              <IntelCard title="Weekly sell pressure, by cohort" meta="weighted ATOM per week">
+              <IntelCard title="Weekly sell pressure, by cohort" meta="weighted ATOM per week" shareFilename="bedrock-sell-pressure-weekly"
+                share={{
+                  title: "Weekly sell pressure by cohort · Cosmos HUB",
+                  subtitle: `Weighted exchange-bound ATOM per week · ${c.weeks.length} indexed week${c.weeks.length === 1 ? "" : "s"}`,
+                  context: "Likelihood-weighted outflow attributed to the sender's wealth tier. Sell intent, not confirmed sales.",
+                  body: <ShareLineChart unit="ATOM" height={260} series={spOrder.map((co) => ({
+                    label: SP[co]?.label ?? co,
+                    color: SP[co]?.color ?? "var(--ink-40)",
+                    points: c.weeks.map((w) => ({ date: fmtWeek(w.week), value: c.series.find((pt) => pt.week === w.week && pt.cohort === co)?.weighted ?? 0 })),
+                  }))} />,
+                }}>
                 <LineChart
                   series={spOrder.map((co) => ({
                     label: SP[co]?.label ?? co,

@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { MetricCard } from "@/components/console/MetricCard";
+import { ShareBars } from "@/components/share/ShareCharts";
 import { AddressLink } from "@/components/address/AddressLink";
 import { getRecentFlows, getLabels, getExchangeNetFlow, type LabelRow } from "@/lib/indexer";
 import { seo } from "@/lib/seo";
@@ -119,7 +120,14 @@ export default async function Signals() {
 
           {/* The owned signal: largest moves, labeled + tagged by exchange direction */}
           <div className="span-12">
-            <IntelCard title="Largest moves" meta={`≥ 10k ATOM · ${live ? "live from the indexer" : "indexer offline"}`}>
+            <IntelCard title="Largest moves" meta={`≥ 10k ATOM · ${live ? "live from the indexer" : "indexer offline"}`} shareFilename="bedrock-largest-moves"
+              share={{
+                title: "Largest ATOM moves · Cosmos HUB",
+                subtitle: "Transfers of 10k ATOM or more, most recent blocks",
+                big: fmtCompact(largest), unit: "ATOM · biggest single move",
+                context: `${fmtCompact(toExch)} ATOM moved onto exchanges against ${fmtCompact(fromExch)} moving off. A deposit is sell intent, not a confirmed sale.`,
+                body: <ShareBars rows={top.slice(0, 7).map((f) => ({ label: flowTag(f.from, f.to, f.kind).label, value: atomOf(f.amount_uatom), color: flowTag(f.from, f.to, f.kind).color, note: `· ${ago(f.time)}` }))} />,
+              }}>
               {top.length === 0 ? (
                 <div style={{ fontSize: 12.5, color: "var(--ink-50)", padding: "6px 0" }}>
                   No moves above 10,000 ATOM in the most recent blocks yet, they surface here as they happen. Full list on{" "}

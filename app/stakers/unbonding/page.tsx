@@ -3,6 +3,7 @@
 // own timeline) leading the completion chart and the per-wallet/validator tables.
 
 import { MetricCardLive } from "@/components/console/MetricCardLive";
+import { ShareBars, ShareColumns } from "@/components/share/ShareCharts";
 import {
   ConsolePage, ConsoleModule, IntelCard,
 } from "@/components/console/Console";
@@ -57,7 +58,14 @@ export default async function StakersUnbonding() {
         </div>
 
         <div className="span-12">
-          <IntelCard title="Completion schedule" meta="ATOM completing unbond each of the next 21 days · hover a day">
+          <IntelCard title="Completion schedule" meta={`ATOM completing unbond each of the next ${u.schedule.length} days · hover a day`} shareFilename="bedrock-unbonding-schedule"
+            share={{
+              title: "ATOM unbonding schedule · Cosmos HUB",
+              subtitle: `Completing unbond each of the next ${u.schedule.length} days`,
+              big: fmtCompact(u.total_atom), unit: "ATOM in the queue",
+              context: `${u.largest_day ? `Peak ${fmtCompact(u.largest_day.atom)} ATOM on ${u.largest_day.date}. ` : ""}${u.pct_of_bonded ? `${u.pct_of_bonded.toFixed(2)}% of bonded stake. ` : ""}Unbonding is an exit from staking, not a sale.`,
+              body: <ShareColumns points={u.schedule.map((d) => ({ label: d.date.slice(5), value: d.value }))} unit="ATOM" />,
+            }}>
             <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 180, paddingTop: 10 }}>
               {u.schedule.map((d, i) => {
                 const peak = d.value === maxDay;
@@ -84,7 +92,14 @@ export default async function StakersUnbonding() {
         </div>
 
         <div className="span-12">
-          <IntelCard title="Largest wallets exiting" meta={u.live ? "aggregated across entries, live" : "snapshot"}>
+          <IntelCard title="Largest wallets exiting" meta={u.live ? "aggregated across entries, live" : "snapshot"} shareFilename="bedrock-unbonding-wallets"
+            share={{
+              title: "Largest wallets exiting the ATOM stake · Cosmos HUB",
+              subtitle: "Aggregated across unbonding entries, live",
+              big: fmtCompact(u.top_wallets.reduce((acc, w) => acc + w.atom, 0)), unit: `ATOM across the top ${u.top_wallets.length}`,
+              context: `${u.unique_wallets ? `${fmtN(u.unique_wallets)} wallets in the queue. ` : ""}Unbonding is an exit from staking, not a sale.`,
+              body: <ShareBars rows={u.top_wallets.slice(0, 8).map((w) => ({ label: shortAddr(w.delegator), value: w.atom, note: w.next_completion ? `· ${w.next_completion}` : undefined }))} />,
+            }}>
             {u.top_wallets.length === 0 ? (
               <div style={{ fontSize: 13, color: "var(--ink-60)" }}>Per-wallet detail is unavailable right now.</div>
             ) : (

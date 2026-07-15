@@ -4,6 +4,7 @@
 // nothing here is assumed, each row names how it was verified.
 
 import { ConsolePage, ConsoleModule, StatusStrip, StatusStripCell, SectionLabel, IntelCard } from "@/components/console/Console";
+import { ShareBars } from "@/components/share/ShareCharts";
 import { Soon } from "@/components/console/Soon";
 import { AddressLink } from "@/components/address/AddressLink";
 import { getLabels, type LabelRow } from "@/lib/indexer";
@@ -112,7 +113,14 @@ export default async function LabelsPage() {
             const rows = (byCat.get(c.key) ?? []).slice().sort((a, b) => a.label.localeCompare(b.label));
             return (
               <div key={c.key} className="span-12">
-                <IntelCard title={c.title} meta={`${rows.length} ${rows.length === 1 ? "address" : "addresses"}`}>
+                <IntelCard title={c.title} meta={`${rows.length} ${rows.length === 1 ? "address" : "addresses"}`} shareFilename={`bedrock-labels-${c.key}`}
+                  share={{
+                    title: `${c.title} · Cosmos HUB`,
+                    subtitle: `${rows.length} verified ${rows.length === 1 ? "address" : "addresses"}`,
+                    big: String(rows.length), unit: `address${rows.length === 1 ? "" : "es"}`,
+                    context: "Bedrock's own attribution from public on-chain evidence, validator key identity, self-declared monikers and chain-of-custody. Best-effort analytical labels, not confirmed by the exchanges.",
+                    body: <ShareBars unit="" rows={[...new Set(rows.map((r) => r.label))].slice(0, 8).map((lab) => ({ label: lab, value: rows.filter((r) => r.label === lab).length, display: String(rows.filter((r) => r.label === lab).length), color: c.color }))} />,
+                  }}>
                   <div style={{ fontSize: 12, color: "var(--ink-60)", lineHeight: 1.5, marginBottom: 12, maxWidth: 900 }}>
                     {c.blurb}
                   </div>

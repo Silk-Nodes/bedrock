@@ -1,6 +1,7 @@
 // /atom/governance - Proposal history + notable props.
 
 import { MetricCard } from "@/components/console/MetricCard";
+import { ShareBars } from "@/components/share/ShareCharts";
 import {
   ConsolePage, ConsoleModule,
   IntelCard,
@@ -51,7 +52,14 @@ export default async function AtomGovernance() {
         </div>
 
         <div className="span-12">
-          <IntelCard title="On-chain proposals" meta={govLive ? "live, scam-filtered" : "unavailable"}>
+          <IntelCard title="On-chain proposals" meta={govLive ? "live, scam-filtered" : "unavailable"} shareFilename="bedrock-gov-proposals"
+            share={proposals.length ? {
+              title: "Cosmos Hub proposals",
+              subtitle: "Latest on-chain proposals, scam-filtered",
+              big: String(voting), unit: "in voting",
+              context: `${passed} passed and ${rejected} rejected all-time · quorum ${GOV_STATS.quorum_pct}%. Tallies live on-chain.`,
+              body: <ShareBars unit="" rows={proposals.slice(0, 7).map((p) => ({ label: `#${p.id} ${p.title}`, value: p.tally.yes, display: `${p.tally.yes.toFixed(0)}% yes` }))} />,
+            } : undefined}>
             {proposals.length === 0 ? (
               <div style={{ fontSize: 13, color: "var(--ink-60)" }}>No proposals available right now.</div>
             ) : (

@@ -18,7 +18,7 @@ import { TipCard } from "@/components/charts/TipCard";
 import { BurnChart } from "@/components/atom/BurnChart";
 import { BURN_SUMMARY, BURN_DAILY, BURN_CUMULATIVE, BURN_ADDRESS } from "@/data/atom-burn";
 import { reconstructSupplySeries, reconstructInflationSeries } from "@/lib/series";
-import { ShareLineChart } from "@/components/share/ShareCharts";
+import { ShareLineChart, ShareBars, ShareStack } from "@/components/share/ShareCharts";
 import { seo } from "@/lib/seo";
 
 export const revalidate = 300;
@@ -104,7 +104,13 @@ export default async function AtomSupply() {
           {/* Live hero: the supply is changing right now. Base values are real
               on-chain reads; the tick advances at the live mint rate. */}
           <div className="span-6">
-            <IntelCard title="Total supply · live" meta={`minting ${mintPerSec.toFixed(2)} ATOM/sec · ${fmtCompact(chain.annual_provisions)} ATOM/yr`} accent>
+            <IntelCard title="Total supply · live" meta={`minting ${mintPerSec.toFixed(2)} ATOM/sec · ${fmtCompact(chain.annual_provisions)} ATOM/yr`} accent shareFilename="bedrock-atom-total-supply"
+              share={{
+                title: "ATOM total supply · Cosmos HUB",
+                subtitle: `Minting ${mintPerSec.toFixed(2)} ATOM per second · no hard cap`,
+                big: fmtCompact(chain.total_supply), unit: "ATOM",
+                context: `Every ~6s block mints about ${(mintPerSec * 6).toFixed(1)} ATOM · inflation ${chain.inflation_pct.toFixed(1)}% · ${fmtCompact(chain.annual_provisions)} ATOM a year. Read live from the chain's bank module.`,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
                 <div>
                   <SupplyTicker base={chain.total_supply} ratePerSec={mintPerSec} fetchedAt={fetchedAt} fontSize={44} />
@@ -117,7 +123,13 @@ export default async function AtomSupply() {
             </IntelCard>
           </div>
           <div className="span-6">
-            <IntelCard title="Burned · live" meta={`burn pace ${(burnPerSec * 86_400).toFixed(0)} ATOM/day · 30d avg`}>
+            <IntelCard title="Burned · live" meta={`burn pace ${(burnPerSec * 86_400).toFixed(0)} ATOM/day · 30d avg`} shareFilename="bedrock-atom-burned-live"
+              share={{
+                title: "ATOM burned · Cosmos HUB",
+                subtitle: `Burn pace ${(burnPerSec * 86_400).toFixed(0)} ATOM/day · 30-day average`,
+                big: fmtCompact(burn.total_atom), unit: "ATOM removed forever",
+                context: `Issuance outpaces burn by roughly ${(mintPerSec / Math.max(burnPerSec, 1e-6)).toFixed(0)}×, so supply still grows about ${fmtCompact(chain.annual_provisions - burnPerSec * 31_557_600)} ATOM a year. Total is the live on-chain balance of the burn address.`,
+              }}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", flex: 1 }}>
                 <div>
                   <SupplyTicker base={burn.total_atom} ratePerSec={burnPerSec} fetchedAt={fetchedAt} fontSize={44} color="var(--iron)" />
@@ -165,7 +177,18 @@ export default async function AtomSupply() {
                 <MetricCard label="Rewards re-staked" value={`${restakedShare.toFixed(0)}%`} unit="of claimed" series={[]} color="var(--moss)" footnote={`sold ${soldShare.toFixed(0)}% · liquid ${liquidShare.toFixed(0)}%`} />
               </div>
               <div className="span-12">
-                <IntelCard title="Where claimed rewards go" meta={`last ${irWeeks} indexed weeks · same-wallet same-week attribution`}>
+                <IntelCard title="Where claimed rewards go" meta={`last ${irWeeks} indexed weeks · same-wallet same-week attribution`} shareFilename="bedrock-reward-destination"
+                  share={{
+                    title: "Where claimed ATOM rewards go · Cosmos HUB",
+                    subtitle: `Last ${irWeeks} indexed weeks · same-wallet, same-week attribution`,
+                    big: `${restakedShare.toFixed(0)}%`, unit: "re-staked",
+                    context: "Sold means a likelihood-weighted sell route from the same wallet in the same week it claimed. That is sell intent and a conservative lower bound, not a confirmed sale.",
+                    body: <ShareStack rows={[{ label: "", segments: [
+                      { label: `re-staked · ${fmtCompact(ir.restaked)}`, value: ir.restaked, color: "var(--moss)" },
+                      { label: `sell routes · ${fmtCompact(ir.sold)}`, value: ir.sold, color: "var(--iron)" },
+                      { label: `liquid · ${fmtCompact(ir.liquid)}`, value: ir.liquid, color: "var(--slate)" },
+                    ] }]} />,
+                  }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                     <div style={{ display: "flex", height: 12, borderRadius: 2, overflow: "hidden", border: "1px solid var(--card-line)" }}>
                       <div style={{ width: `${soldShare}%`, background: "var(--iron)" }} />
@@ -191,7 +214,13 @@ export default async function AtomSupply() {
           {/* ATOM at the market cap of X (hypeburn-style comparison chips) */}
           {cmp.live && cmp.atom && (
             <div className="span-12">
-              <IntelCard title="ATOM at the market cap of…" meta={`implied ATOM price · ATOM mcap $${(cmp.atom.mcap / 1e9).toFixed(2)}B · hover for FDV`}>
+              <IntelCard title="ATOM at the market cap of…" meta={`implied ATOM price · ATOM mcap $${(cmp.atom.mcap / 1e9).toFixed(2)}B · hover for FDV`} shareFilename="bedrock-atom-mcap-of"
+                share={{
+                  title: "ATOM at the market cap of… · Cosmos HUB",
+                  subtitle: `Implied ATOM price · ATOM market cap $${(cmp.atom.mcap / 1e9).toFixed(2)}B`,
+                  context: "The price ATOM would trade at if it held each asset's market cap today, at ATOM's current supply. A comparison, not a forecast.",
+                  body: <ShareBars unit="" rows={cmp.coins.slice(0, 6).map((c) => ({ label: c.symbol, value: c.mcap / cmp.atom!.mcap, display: `$${(cmp.atom!.price * (c.mcap / cmp.atom!.mcap)).toFixed(2)}`, note: `· ${(c.mcap / cmp.atom!.mcap).toFixed(2)}×` }))} />,
+                }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 10 }}>
                   {cmp.coins.map((c) => {
                     const mult = c.mcap / cmp.atom!.mcap;

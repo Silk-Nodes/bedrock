@@ -9,6 +9,7 @@ import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Cons
 import { MetricCard } from "@/components/console/MetricCard";
 import { getLiveValidators } from "@/lib/validators";
 import { getValidatorFlow, spanLabel } from "@/lib/indexer";
+import { ShareBars } from "@/components/share/ShareCharts";
 import { seo } from "@/lib/seo";
 
 function fmtCompact(n: number): string {
@@ -112,8 +113,11 @@ export default async function ValidatorsConsole() {
               shareFilename="bedrock-validator-momentum"
               share={hasMomentum ? {
                 title: "Validator momentum · Cosmos HUB",
-                subtitle: "Which validators are gaining and losing stake",
-                context: "Net delegation per validator over the indexed window, from Bedrock's own indexer.",
+                subtitle: `Net delegation · last ${span}`,
+                context: "Which validators gained and lost stake over the window the indexer actually covers, from Bedrock's own indexer.",
+                // Without a body this card exported a bare headline: a title over
+                // empty space, with the actual finding left on the page.
+                body: <ShareBars diverging unit="ATOM" positiveColor="var(--moss)" negativeColor="var(--iron)" rows={[...gainers, ...losers].map((r) => ({ label: momoName(r.validator), value: r.net_atom }))} />,
               } : undefined}
             >
               {!hasMomentum ? (

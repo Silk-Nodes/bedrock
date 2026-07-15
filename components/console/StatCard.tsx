@@ -2,21 +2,31 @@
 // glowing baseline in the metric's accent color, and a big light serif number.
 // Reads clean without needing a sparkline. Shared across the ATOM holder pages.
 
-export function StatCard({
+import { ShareButton } from "@/components/share/ShareButton";
+import { stampCard } from "@/components/share/stampCard";
+import type { SocialCardProps } from "@/components/share/SocialCard";
+
+export async function StatCard({
   label,
   value,
   unit,
   sub,
   accent,
+  share,
+  shareFilename,
 }: {
   label: string;
   value: string;
   unit?: string;
   sub: string;
   accent: string;
+  share?: SocialCardProps;
+  shareFilename?: string;
 }) {
+  const shareCard = await stampCard(share);
   return (
     <div
+      className={share ? "share-host" : undefined}
       style={{
         position: "relative",
         overflow: "hidden",
@@ -35,6 +45,11 @@ export function StatCard({
           background: `radial-gradient(circle, ${accent} 0%, transparent 68%)`, opacity: 0.16, pointerEvents: "none",
         }}
       />
+      {shareCard && (
+        <span style={{ position: "absolute", top: 8, right: 8, zIndex: 2 }}>
+          <ShareButton reveal card={shareCard} filename={shareFilename} />
+        </span>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 16, whiteSpace: "nowrap" }}>
         <span aria-hidden style={{ width: 6, height: 6, borderRadius: "50%", background: accent, boxShadow: `0 0 8px ${accent}`, flexShrink: 0 }} />
         <span className="data" style={{ fontSize: 9.5, letterSpacing: 0.8, textTransform: "uppercase", color: "var(--ink-40)" }}>{label}</span>

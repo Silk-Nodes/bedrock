@@ -1,6 +1,7 @@
 // /validators/concentration - Top-10 share, Nakamoto, VP distribution (live).
 
 import { MetricCard } from "@/components/console/MetricCard";
+import { ShareBars } from "@/components/share/ShareCharts";
 import {
   ConsolePage, ConsoleModule, IntelCard,
 } from "@/components/console/Console";
@@ -65,7 +66,14 @@ export default async function ValidatorsConcentration() {
         </div>
 
         <div className="span-12">
-          <IntelCard title="Voting power, top 10" meta="share of total stake">
+          <IntelCard title="Voting power, top 10" meta="share of total stake" shareFilename="bedrock-voting-power-concentration"
+            share={liveOn ? {
+              title: "Cosmos Hub voting power concentration",
+              subtitle: `Top ${top10.length} validators by share of total stake`,
+              big: String(nakamoto), unit: "Nakamoto coefficient",
+              context: `The top ${top10.length} hold ${top10share.toFixed(1)}% · the largest single validator ${largestPct.toFixed(1)}% · everyone below the top ten holds ${restShare.toFixed(1)}%. Live on-chain.`,
+              body: <ShareBars rows={top10.map((v) => ({ label: `${v.rank}. ${v.moniker}`, value: v.voting_power, note: `· ${v.voting_power_pct.toFixed(1)}%` }))} />,
+            } : undefined}>
             {liveOn ? top10.map((v, i) => (
               <div key={v.rank} style={{
                 display: "grid", gridTemplateColumns: "150px 1fr 80px", alignItems: "center", gap: 12,
