@@ -3,12 +3,16 @@
 // an auto-computed trend delta, and its OWN timeline (a glowing area sparkline).
 // No prose needed, you see the value AND where it's been at a glance.
 
+import { ShareButton } from "@/components/share/ShareButton";
+import { stampCard } from "@/components/share/stampCard";
+import type { SocialCardProps } from "@/components/share/SocialCard";
+
 function fmtPct(p: number): string {
   const s = p >= 0 ? "+" : "−";
   return `${s}${Math.abs(p).toFixed(p >= 10 || p <= -10 ? 0 : 1)}%`;
 }
 
-export function MetricCard({
+export async function MetricCard({
   label,
   value,
   unit,
@@ -21,6 +25,8 @@ export function MetricCard({
   delta = true,
   footnote,
   height = 230,
+  share,
+  shareFilename,
 }: {
   label: string;
   value: string;
@@ -31,7 +37,10 @@ export function MetricCard({
   delta?: boolean;
   footnote?: string;
   height?: number;
+  share?: SocialCardProps;
+  shareFilename?: string;
 }) {
+  const shareCard = await stampCard(share);
   const gid = "mc-" + label.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
   const W = 300;
   const H = 64; // sparkline height
@@ -58,7 +67,12 @@ export function MetricCard({
   // Natural height: tall only when there's a real timeline, compact when
   // accruing (no big empty box). minHeight keeps a row of accruing cards even.
   return (
-    <div className="surface" style={{ minHeight: has ? height : 118, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
+    <div className={`surface${share ? " share-host" : ""}`} style={{ minHeight: has ? height : 118, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12, position: "relative" }}>
+      {shareCard && (
+        <span style={{ position: "absolute", top: 8, right: 8, zIndex: 2 }}>
+          <ShareButton reveal card={shareCard} filename={shareFilename} />
+        </span>
+      )}
       <div>
         <div className="data" style={{ fontSize: 9.5, letterSpacing: 1.6, textTransform: "uppercase", color: "var(--ink-40)" }}>{label}</div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 10 }}>
