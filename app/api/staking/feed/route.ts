@@ -30,10 +30,14 @@ export async function GET(req: NextRequest) {
   ]);
 
   const monikerByOper = new Map(vals.validators.map((v) => [v.operator, v.moniker]));
+  const short = (o: string) => `${o.slice(0, 14)}…`;
   const labelled = events.map((e) => ({
     ...e,
-    valName: monikerByOper.get(e.validator) ?? `${e.validator.slice(0, 14)}…`,
+    valName: monikerByOper.get(e.validator) ?? short(e.validator),
     logo: logos[e.validator] ?? null,
+    // Redelegate destination, labelled so the feed can show src → dst.
+    valNameDst: e.validator_dst ? (monikerByOper.get(e.validator_dst) ?? short(e.validator_dst)) : undefined,
+    logoDst: e.validator_dst ? (logos[e.validator_dst] ?? null) : null,
   }));
 
   return NextResponse.json({ live, total, events: labelled }, { headers: { "Cache-Control": "no-store" } });

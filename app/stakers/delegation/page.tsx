@@ -99,7 +99,13 @@ export default async function StakersDelegation() {
 
   // First page of the feed, labelled with validator monikers for the client
   // component. Subsequent filter changes + "load more" fetch server-side.
-  const feedEvents = feed.events.map((e) => ({ ...e, valName: label(e.validator), logo: logos[e.validator] ?? null }));
+  const feedEvents = feed.events.map((e) => ({
+    ...e,
+    valName: label(e.validator),
+    logo: logos[e.validator] ?? null,
+    valNameDst: e.validator_dst ? label(e.validator_dst) : undefined,
+    logoDst: e.validator_dst ? (logos[e.validator_dst] ?? null) : null,
+  }));
 
   // Momentum: 24h net vs the 7d daily pace (is bonding speeding up or slowing?).
   const days = Math.max(1, (new Date(nf.window_end ?? 0).getTime() - new Date(nf.window_start ?? 0).getTime()) / 86_400_000);
