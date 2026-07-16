@@ -18,8 +18,11 @@ export type FeedEvent = {
   type: "delegate" | "unbond" | "redelegate" | "unbond_cancel";
   delegator: string;
   validator: string;
+  validator_dst?: string;
   valName: string;
+  valNameDst?: string;   // redelegate destination moniker
   logo?: string | null;
+  logoDst?: string | null;
   amount_atom: number;
   time: string;
 };
@@ -68,7 +71,7 @@ const VERB: Record<FeedEvent["type"], string> = {
   delegate: "staked to",
   unbond: "unstaked from",
   unbond_cancel: "cancelled unbond from",
-  redelegate: "redelegated to",
+  redelegate: "redelegated", // direction shown as src → dst, not a single "to"
 };
 const TYPE_LABEL: Record<FeedEvent["type"], string> = {
   delegate: "delegate",
@@ -182,29 +185,51 @@ export function DelegationFeed({
           <div style={{ display: "flex", flexDirection: "column" }}>
             {events.map((e, i) => {
               const tone = TONE[e.type];
+              const isRedelegate = e.type === "redelegate";
+              // Authz-initiated redelegations carry no delegator; the event is
+              // still real, we just don't know who signed it. Show it, but don't
+              // make a broken address link.
+              const hasDelegator = !!e.delegator;
               return (
                 <div
                   key={`${e.tx_hash}-${e.height}-${e.type}-${i}`}
-                  className="feed-row feed-row-click"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => open(e.delegator)}
-                  onKeyDown={(ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); open(e.delegator); } }}
-                  title={`Open ${e.delegator}`}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 4px", borderBottom: "1px solid var(--ink-10)", fontSize: 12.5, cursor: "pointer" }}
+                  className={`feed-row${hasDelegator ? " feed-row-click" : ""}`}
+                  role={hasDelegator ? "button" : undefined}
+                  tabIndex={hasDelegator ? 0 : undefined}
+                  onClick={hasDelegator ? () => open(e.delegator) : undefined}
+                  onKeyDown={hasDelegator ? (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); open(e.delegator); } } : undefined}
+                  title={hasDelegator ? `Open ${e.delegator}` : undefined}
+                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 4px", borderBottom: "1px solid var(--ink-10)", fontSize: 12.5, cursor: hasDelegator ? "pointer" : "default" }}
                 >
                   <span className="data feed-type" style={{ flexShrink: 0, width: 62, fontSize: 9, letterSpacing: 0.8, textTransform: "uppercase", fontWeight: 700, color: tone }}>{TYPE_LABEL[e.type]}</span>
                   <span className="feed-amt" style={{ flexShrink: 0, width: 92, fontFamily: "var(--font-display)", fontWeight: 600, color: "var(--ink)", textAlign: "right" }}>
                     {fmtCompact(e.amount_atom)} <span style={{ fontSize: 9, color: "var(--ink-40)" }}>ATOM</span>
                   </span>
                   <span className="feed-mid" style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                    <span className="data" style={{ fontSize: 11, color: "var(--ink-40)", borderBottom: "1px dotted var(--ink-40)" }}>{shortAddr(e.delegator)}</span>
+                    <span className="data" style={{ fontSize: 11, color: "var(--ink-40)", borderBottom: hasDelegator ? "1px dotted var(--ink-40)" : "none", fontStyle: hasDelegator ? "normal" : "italic" }}>{hasDelegator ? shortAddr(e.delegator) : "authz"}</span>
                     <span style={{ color: "var(--ink-40)" }}>{VERB[e.type]}</span>
                   </span>
-                  <ValidatorLink oper={e.validator} className="cp-click" style={{ display: "inline-flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0, color: "var(--ink)", fontWeight: 600, borderRadius: 3 }}>
-                    <ValidatorAvatar operator={e.validator} logo={e.logo} moniker={e.valName} size={18} />
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", borderBottom: "1px dotted var(--ink-20)" }}>{e.valName}</span>
-                  </ValidatorLink>
+                  {isRedelegate ? (
+                    // source → destination
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+                      <ValidatorLink oper={e.validator} className="cp-click" style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0, color: "var(--ink-60)", fontWeight: 600, borderRadius: 3 }}>
+                        <ValidatorAvatar operator={e.validator} logo={e.logo} moniker={e.valName} size={16} />
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.valName}</span>
+                      </ValidatorLink>
+                      <span style={{ color: "var(--ink-40)", flexShrink: 0 }}>→</span>
+                      {e.validator_dst ? (
+                        <ValidatorLink oper={e.validator_dst} className="cp-click" style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0, color: "var(--ink)", fontWeight: 600, borderRadius: 3 }}>
+                          <ValidatorAvatar operator={e.validator_dst} logo={e.logoDst} moniker={e.valNameDst ?? e.validator_dst} size={16} />
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", borderBottom: "1px dotted var(--ink-20)" }}>{e.valNameDst ?? shortAddr(e.validator_dst)}</span>
+                        </ValidatorLink>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <ValidatorLink oper={e.validator} className="cp-click" style={{ display: "inline-flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0, color: "var(--ink)", fontWeight: 600, borderRadius: 3 }}>
+                      <ValidatorAvatar operator={e.validator} logo={e.logo} moniker={e.valName} size={18} />
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", borderBottom: "1px dotted var(--ink-20)" }}>{e.valName}</span>
+                    </ValidatorLink>
+                  )}
                   <span className="data feed-ago" style={{ flexShrink: 0, fontSize: 10.5, color: "var(--ink-40)" }}>{fmtAgo(e.time)}<span className="feed-ago-suffix"> ago</span></span>
                 </div>
               );
