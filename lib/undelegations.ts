@@ -1,12 +1,20 @@
 // Live Cosmos Hub undelegations (the 21-day unbonding queue), server-side.
 //
-// Cosmos REST has no global unbonding endpoint, so we enumerate every bonded
-// validator's unbonding_delegations and aggregate the entries. This is the same
-// methodology explorers like Smart Stake use, and matches their exported daily
-// totals. From the raw entries (delegator, validator, amount, completion date)
-// we derive the daily schedule, unique-wallet count, size distribution, wallet
-// and validator concentration, and the largest exits. ~200 requests, cached 1h;
-// degrades to an empty "unavailable" state if the chain can't be reached.
+// Cosmos REST has no global unbonding endpoint, so we enumerate EVERY
+// validator's unbonding_delegations and aggregate the entries. From the raw
+// entries (delegator, validator, amount, completion date) we derive the daily
+// schedule, unique-wallet count, size distribution, wallet and validator
+// concentration, and the largest exits. Cached 1h; degrades to an empty
+// "unavailable" state if the chain can't be reached.
+//
+// Completeness matters here (verified against the full validator set):
+//   1. We enumerate ALL validator statuses, not just BONDED. When a validator is
+//      jailed, tombstoned, or shutting down, its status flips off "bonded" and
+//      its delegators' unbondings would otherwise vanish from the queue — which
+//      is exactly when unbonding spikes. That was ~0.6% (~39k ATOM) missing.
+//   2. We follow pagination on the per-validator unbonding query. A very popular
+//      validator can have >1000 unbonding delegators; the un-paginated version
+//      truncated them.
 
 import { unstable_cache } from "next/cache";
 
@@ -101,38 +109,59 @@ function fromSnapshot(): LiveUndelegations {
   };
 }
 
-async function computeLiveUndelegations(): Promise<LiveUndelegations> {
-  const [vd, poolD] = await Promise.all([
-    jget("/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=300"),
-    jget("/cosmos/staking/v1beta1/pool"),
-  ]);
-  const raw = (vd?.validators ?? []) as { operator_address?: string; description?: { moniker?: string } }[];
-  if (!raw.length) return fromSnapshot();
-
+// Enumerate EVERY validator (all statuses), following the validator-list
+// pagination. No status filter, so bonded + unbonding + unbonded are all
+// included. Guarded against a runaway next_key.
+async function listAllValidators(): Promise<{ opers: string[]; monikerByOper: Map<string, string> }> {
   const monikerByOper = new Map<string, string>();
   const opers: string[] = [];
-  for (const v of raw) {
-    if (v.operator_address) {
-      opers.push(v.operator_address);
-      monikerByOper.set(v.operator_address, v.description?.moniker ?? v.operator_address);
+  let key: string | undefined;
+  for (let guard = 0; guard < 20; guard++) {
+    const qs = `pagination.limit=500${key ? `&pagination.key=${encodeURIComponent(key)}` : ""}`;
+    const d = await jget(`/cosmos/staking/v1beta1/validators?${qs}`);
+    const vs = (d?.validators ?? []) as { operator_address?: string; description?: { moniker?: string } }[];
+    for (const v of vs) {
+      if (v.operator_address) {
+        opers.push(v.operator_address);
+        monikerByOper.set(v.operator_address, v.description?.moniker ?? v.operator_address);
+      }
     }
+    key = (d?.pagination as { next_key?: string } | undefined)?.next_key ?? undefined;
+    if (!key) break;
   }
+  return { opers, monikerByOper };
+}
+
+async function computeLiveUndelegations(): Promise<LiveUndelegations> {
+  const [{ opers, monikerByOper }, poolD] = await Promise.all([
+    listAllValidators(),
+    jget("/cosmos/staking/v1beta1/pool"),
+  ]);
+  if (!opers.length) return fromSnapshot();
+
   const bonded = Number((poolD?.pool as { bonded_tokens?: string } | undefined)?.bonded_tokens) / 1e6 || 0;
 
   type Entry = { oper: string; delegator: string; atom: number; day: string };
   const all: Entry[] = [];
   await forEachLimit(opers, 8, async (oper) => {
-    const d = await jget(`/cosmos/staking/v1beta1/validators/${oper}/unbonding_delegations?pagination.limit=1000`);
-    const resps = (d?.unbonding_responses ?? []) as {
-      delegator_address?: string;
-      entries?: { completion_time?: string; balance?: string }[];
-    }[];
-    for (const r of resps) {
-      for (const e of r.entries ?? []) {
-        const atom = Number(e.balance) / 1e6;
-        if (!Number.isFinite(atom) || atom <= 0) continue;
-        all.push({ oper, delegator: r.delegator_address ?? "", atom, day: (e.completion_time ?? "").slice(0, 10) });
+    // Follow pagination: a popular validator can have >1000 unbonding delegators.
+    let key: string | undefined;
+    for (let guard = 0; guard < 10; guard++) {
+      const qs = `pagination.limit=1000${key ? `&pagination.key=${encodeURIComponent(key)}` : ""}`;
+      const d = await jget(`/cosmos/staking/v1beta1/validators/${oper}/unbonding_delegations?${qs}`);
+      const resps = (d?.unbonding_responses ?? []) as {
+        delegator_address?: string;
+        entries?: { completion_time?: string; balance?: string }[];
+      }[];
+      for (const r of resps) {
+        for (const e of r.entries ?? []) {
+          const atom = Number(e.balance) / 1e6;
+          if (!Number.isFinite(atom) || atom <= 0) continue;
+          all.push({ oper, delegator: r.delegator_address ?? "", atom, day: (e.completion_time ?? "").slice(0, 10) });
+        }
       }
+      key = (d?.pagination as { next_key?: string } | undefined)?.next_key ?? undefined;
+      if (!key) break;
     }
   });
   if (!all.length) return fromSnapshot();
@@ -224,6 +253,6 @@ async function computeLiveUndelegations(): Promise<LiveUndelegations> {
 // and is shared across all visitors, so cost is flat under load.
 export const getLiveUndelegations = unstable_cache(
   computeLiveUndelegations,
-  ["live-undelegations-v1"],
+  ["live-undelegations-v2"], // v2: all validator statuses + per-validator pagination
   { revalidate: 3600 },
 );
