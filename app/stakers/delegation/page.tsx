@@ -11,7 +11,7 @@ import { Soon } from "@/components/console/Soon";
 import { ValidatorAvatar } from "@/components/console/ValidatorAvatar";
 import { ValidatorLink } from "@/components/validator/ValidatorLink";
 import { DelegationFeed } from "@/components/console/DelegationFeed";
-import { getStakingNetFlow, getValidatorFlow, getStakingRecent } from "@/lib/indexer";
+import { getStakingNetFlow, getValidatorFlow, getStakingFeed } from "@/lib/indexer";
 import { getLiveValidators, getValidatorLogoMap } from "@/lib/validators";
 import { seo } from "@/lib/seo";
 
@@ -75,12 +75,12 @@ function FlowList({ title, rows, accent }: { title: string; rows: FlowRow[]; acc
 }
 
 export default async function StakersDelegation() {
-  const [nf, nf24, flow, vals, recent, logos] = await Promise.all([
+  const [nf, nf24, flow, vals, feed, logos] = await Promise.all([
     getStakingNetFlow(168),
     getStakingNetFlow(24),
     getValidatorFlow(168, 400),
     getLiveValidators(0), // cached core: gives moniker + operator, no logo fetch
-    getStakingRecent(1, 200), // live per-event feed (filtered client-side)
+    getStakingFeed({ minAtom: 0, type: "all", hours: 168, limit: 60 }), // first page; filters + paging are server-side from here
     getValidatorLogoMap(), // server-resolved keybase logos for ALL validators (cached 6h)
   ]);
   const span = spanLabel(nf.window_start, nf.window_end);
@@ -97,8 +97,9 @@ export default async function StakersDelegation() {
   const gaining = named.filter((r) => r.net_atom > 0).length;
   const losing = named.filter((r) => r.net_atom < 0).length;
 
-  // Live feed events, labelled with validator monikers for the client component.
-  const feedEvents = recent.events.map((e) => ({ ...e, valName: label(e.validator), logo: logos[e.validator] ?? null }));
+  // First page of the feed, labelled with validator monikers for the client
+  // component. Subsequent filter changes + "load more" fetch server-side.
+  const feedEvents = feed.events.map((e) => ({ ...e, valName: label(e.validator), logo: logos[e.validator] ?? null }));
 
   // Momentum: 24h net vs the 7d daily pace (is bonding speeding up or slowing?).
   const days = Math.max(1, (new Date(nf.window_end ?? 0).getTime() - new Date(nf.window_start ?? 0).getTime()) / 86_400_000);
@@ -192,10 +193,11 @@ export default async function StakersDelegation() {
             </div>
           )}
 
-          {/* Live per-event feed with type + size filters (client-side). */}
+          {/* Live per-event feed. Filters + paging run server-side over the whole
+              window, so a large old event is never hidden behind recent small ones. */}
           {feedEvents.length > 0 && (
             <div className="span-12">
-              <DelegationFeed events={feedEvents} />
+              <DelegationFeed initialEvents={feedEvents} initialTotal={feed.total} />
             </div>
           )}
         </div>

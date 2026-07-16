@@ -1,10 +1,13 @@
 "use client";
 
-// Live delegation feed with client-side filters. The server hands us a generous
-// window of recent staking events (already labelled with validator monikers);
-// we filter by type and minimum size in memory, so it's instant with no refetch.
+// Live delegation feed. The type + size filters run in SQL over the WHOLE
+// window (via /api/staking/feed), not in the browser over the newest 200, so a
+// large old unbond is never hidden behind a page of small recent ones. The
+// footer reports "showing X of N in window" truthfully, and "Load more" grows
+// the page. The first page is server-rendered; only filter changes and Load
+// more refetch.
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ValidatorAvatar } from "./ValidatorAvatar";
 import { useAddressPanel } from "@/components/address/AddressPanelProvider";
 import { ValidatorLink } from "@/components/validator/ValidatorLink";
@@ -12,7 +15,7 @@ import { ValidatorLink } from "@/components/validator/ValidatorLink";
 export type FeedEvent = {
   tx_hash: string;
   height: number;
-  type: "delegate" | "unbond" | "redelegate";
+  type: "delegate" | "unbond" | "redelegate" | "unbond_cancel";
   delegator: string;
   validator: string;
   valName: string;
@@ -21,10 +24,14 @@ export type FeedEvent = {
   time: string;
 };
 
+const HOURS = 168; // the feed window, matched to the page's 7-day flow cards
+const PAGE = 60;
+
 const TYPES = [
   { k: "all", label: "All" },
   { k: "delegate", label: "Delegate" },
   { k: "unbond", label: "Unbond" },
+  { k: "unbond_cancel", label: "Cancel" },
   { k: "redelegate", label: "Redeleg" },
 ] as const;
 
@@ -50,6 +57,25 @@ function fmtAgo(iso: string): string {
 function shortAddr(a: string): string {
   return a.length > 14 ? `${a.slice(0, 9)}…${a.slice(-4)}` : a;
 }
+
+const TONE: Record<FeedEvent["type"], string> = {
+  delegate: "var(--moss)",
+  unbond: "var(--iron)",
+  unbond_cancel: "var(--moss)",
+  redelegate: "var(--slate)",
+};
+const VERB: Record<FeedEvent["type"], string> = {
+  delegate: "staked to",
+  unbond: "unstaked from",
+  unbond_cancel: "cancelled unbond from",
+  redelegate: "redelegated to",
+};
+const TYPE_LABEL: Record<FeedEvent["type"], string> = {
+  delegate: "delegate",
+  unbond: "unbond",
+  unbond_cancel: "cancel",
+  redelegate: "redeleg",
+};
 
 function Chips<T extends string | number>({
   label, options, value, onChange,
@@ -87,14 +113,52 @@ function Chips<T extends string | number>({
   );
 }
 
-export function DelegationFeed({ events }: { events: FeedEvent[] }) {
+export function DelegationFeed({
+  initialEvents,
+  initialTotal,
+}: {
+  initialEvents: FeedEvent[];
+  initialTotal: number;
+}) {
   const { open } = useAddressPanel();
   const [type, setType] = useState<(typeof TYPES)[number]["k"]>("all");
   const [min, setMin] = useState<number>(0);
+  const [events, setEvents] = useState<FeedEvent[]>(initialEvents);
+  const [total, setTotal] = useState<number>(initialTotal);
+  const [limit, setLimit] = useState<number>(PAGE);
+  const [loading, setLoading] = useState(false);
+  // Skip the fetch on first mount: the initial page is already server-rendered
+  // for the default (all / all-sizes) filter.
+  const primed = useRef(false);
 
-  const rows = events
-    .filter((e) => (type === "all" || e.type === type) && e.amount_atom >= min)
-    .slice(0, 60);
+  const fetchFeed = useCallback(async (t: string, m: number, lim: number) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/staking/feed?type=${t}&min=${m}&hours=${HOURS}&limit=${lim}`, { cache: "no-store" });
+      if (res.ok) {
+        const j = (await res.json()) as { events: FeedEvent[]; total: number };
+        setEvents(j.events ?? []);
+        setTotal(j.total ?? 0);
+      }
+    } catch {
+      // keep the last good page on a transient error
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Refetch from the start whenever a filter changes.
+  useEffect(() => {
+    if (!primed.current) { primed.current = true; return; }
+    setLimit(PAGE);
+    fetchFeed(type, min, PAGE);
+  }, [type, min, fetchFeed]);
+
+  const loadMore = () => {
+    const next = limit + PAGE;
+    setLimit(next);
+    fetchFeed(type, min, next);
+  };
 
   return (
     <div className="surface" style={{ padding: "16px 18px" }}>
@@ -110,15 +174,14 @@ export function DelegationFeed({ events }: { events: FeedEvent[] }) {
       </div>
 
       <div className="table-scroll" style={{ maxHeight: 480 }}>
-        {rows.length === 0 ? (
+        {events.length === 0 ? (
           <div style={{ fontSize: 12, color: "var(--ink-40)", padding: "20px 0", textAlign: "center" }}>
-            No events match this filter in the recent window.
+            {loading ? "Loading…" : "No events match this filter in the last 7 days."}
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column" }}>
-            {rows.map((e, i) => {
-              const tone = e.type === "delegate" ? "var(--moss)" : e.type === "unbond" ? "var(--iron)" : "var(--slate)";
-              const verb = e.type === "delegate" ? "staked to" : e.type === "unbond" ? "unstaked from" : "redelegated to";
+            {events.map((e, i) => {
+              const tone = TONE[e.type];
               return (
                 <div
                   key={`${e.tx_hash}-${e.height}-${e.type}-${i}`}
@@ -130,13 +193,13 @@ export function DelegationFeed({ events }: { events: FeedEvent[] }) {
                   title={`Open ${e.delegator}`}
                   style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 4px", borderBottom: "1px solid var(--ink-10)", fontSize: 12.5, cursor: "pointer" }}
                 >
-                  <span className="data feed-type" style={{ flexShrink: 0, width: 62, fontSize: 9, letterSpacing: 0.8, textTransform: "uppercase", fontWeight: 700, color: tone }}>{e.type}</span>
+                  <span className="data feed-type" style={{ flexShrink: 0, width: 62, fontSize: 9, letterSpacing: 0.8, textTransform: "uppercase", fontWeight: 700, color: tone }}>{TYPE_LABEL[e.type]}</span>
                   <span className="feed-amt" style={{ flexShrink: 0, width: 92, fontFamily: "var(--font-display)", fontWeight: 600, color: "var(--ink)", textAlign: "right" }}>
                     {fmtCompact(e.amount_atom)} <span style={{ fontSize: 9, color: "var(--ink-40)" }}>ATOM</span>
                   </span>
                   <span className="feed-mid" style={{ display: "inline-flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                     <span className="data" style={{ fontSize: 11, color: "var(--ink-40)", borderBottom: "1px dotted var(--ink-40)" }}>{shortAddr(e.delegator)}</span>
-                    <span style={{ color: "var(--ink-40)" }}>{verb}</span>
+                    <span style={{ color: "var(--ink-40)" }}>{VERB[e.type]}</span>
                   </span>
                   <ValidatorLink oper={e.validator} className="cp-click" style={{ display: "inline-flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0, color: "var(--ink)", fontWeight: 600, borderRadius: 3 }}>
                     <ValidatorAvatar operator={e.validator} logo={e.logo} moniker={e.valName} size={18} />
@@ -150,8 +213,25 @@ export function DelegationFeed({ events }: { events: FeedEvent[] }) {
         )}
       </div>
 
-      <div style={{ fontSize: 10, color: "var(--ink-40)", marginTop: 8 }}>
-        Showing {rows.length} of the latest {events.length} events. Individual on-chain delegation messages from the Bedrock indexer.
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
+        <span style={{ fontSize: 10, color: "var(--ink-40)" }}>
+          Showing {events.length.toLocaleString("en-US")} of {total.toLocaleString("en-US")} matching in the last 7 days · from the Bedrock indexer
+        </span>
+        {events.length < total && (
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loading}
+            className="data pressable"
+            style={{
+              minHeight: 30, padding: "6px 16px", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", fontWeight: 700,
+              cursor: loading ? "default" : "pointer", color: "var(--hub)", background: "color-mix(in srgb, var(--hub) 12%, var(--paper))",
+              border: "1px solid color-mix(in srgb, var(--hub) 40%, transparent)", borderRadius: 3, opacity: loading ? 0.6 : 1,
+            }}
+          >
+            {loading ? "Loading…" : "Load more"}
+          </button>
+        )}
       </div>
     </div>
   );
