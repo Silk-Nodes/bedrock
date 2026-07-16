@@ -107,7 +107,7 @@ export type StakingEvent = {
   time: string;
   height: number;
   tx_hash: string;
-  type: "delegate" | "unbond" | "redelegate";
+  type: "delegate" | "unbond" | "redelegate" | "unbond_cancel";
   delegator: string;
   validator: string;
   validator_dst: string;
@@ -136,6 +136,46 @@ export async function getStakingRecent(minAtom = 1, limit = 40): Promise<Staking
     };
   } catch {
     return { events: [], live: false };
+  }
+}
+
+// Windowed, server-filtered staking feed. Unlike getStakingRecent (newest N,
+// then filtered in the browser, so a large old event hides behind a page of
+// small recent ones), this pushes the type + size filters into SQL over the
+// whole window and returns the TOTAL matching, so the UI can say "X of N in
+// window" honestly. Paging grows `limit` (re-request), which is correct against
+// a live feed where a keyset by height would drop events sharing a block.
+export type StakingFeed = { events: StakingEvent[]; total: number; live: boolean };
+export async function getStakingFeed(
+  opts: { minAtom?: number; type?: string; hours?: number; limit?: number } = {},
+): Promise<StakingFeed> {
+  const { minAtom = 0, type = "all", hours = 168, limit = 60 } = opts;
+  try {
+    const res = await fetch(
+      `${INDEXER_URL}/api/v1/staking/feed?min=${minAtom}&type=${encodeURIComponent(type)}&hours=${hours}&limit=${limit}`,
+      { next: { revalidate: 30 } },
+    );
+    if (!res.ok) return { events: [], total: 0, live: false };
+    const j = (await res.json()) as {
+      total?: number;
+      events?: { time: string; height: number; tx_hash: string; type: string; delegator: string; validator: string; validator_dst: string; amount_uatom: string }[];
+    };
+    return {
+      events: (j.events ?? []).map((e) => ({
+        time: e.time,
+        height: e.height,
+        tx_hash: e.tx_hash,
+        type: e.type as StakingEvent["type"],
+        delegator: e.delegator,
+        validator: e.validator,
+        validator_dst: e.validator_dst,
+        amount_atom: Number(e.amount_uatom) / 1e6,
+      })),
+      total: j.total ?? 0,
+      live: true,
+    };
+  } catch {
+    return { events: [], total: 0, live: false };
   }
 }
 
