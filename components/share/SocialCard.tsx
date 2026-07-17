@@ -115,17 +115,21 @@ export function SocialCard({
         )}
       </div>
 
-      {/* Big number + delta */}
+      {/* Big number + delta. When the card also carries a body (a chart or
+          table), the hero shrinks: at 124px it ate 114px of a 675px canvas and
+          left the chart ~186px, which is why chart bodies used to overrun the
+          watermark. A slightly smaller hero + a readable chart beats a huge
+          number over a broken one. */}
       {big && (
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: body ? 16 : 24 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 24, flexWrap: "wrap" }}>
             <span
               style={{
                 fontFamily: "var(--font-display)",
                 fontWeight: 900,
-                fontSize: 124,
+                fontSize: body ? 92 : 124,
                 lineHeight: 0.92,
-                letterSpacing: "-4px",
+                letterSpacing: body ? "-3px" : "-4px",
                 color: "var(--ink)",
                 fontVariantNumeric: "tabular-nums",
               }}
@@ -174,11 +178,11 @@ export function SocialCard({
         <div
           style={{
             marginTop: big ? 4 : 8,
-            marginBottom: 12,
+            marginBottom: body ? 8 : 12,
             fontFamily: "var(--font-sans)",
-            fontSize: big ? 18 : 26,
+            fontSize: big ? (body ? 16 : 18) : 26,
             color: "var(--ink-80)",
-            lineHeight: 1.5,
+            lineHeight: 1.45,
             maxWidth: 1000,
           }}
         >
@@ -186,9 +190,15 @@ export function SocialCard({
         </div>
       )}
 
-      {/* Optional body */}
+      {/* Optional body.
+          overflow:hidden is a hard clamp, not decoration: the body slot is
+          whatever the text above leaves (as little as ~190px), and a body that
+          asserts a taller fixed height used to paint straight through the
+          watermark strip and off the canvas. Bodies size themselves to THIS box
+          (see ShareLineChart), and if one ever misbehaves it gets cropped here
+          rather than shipped on top of the colophon. */}
       {body && (
-        <div style={{ flex: 1, marginTop: 12, minHeight: 0 }}>
+        <div style={{ flex: 1, marginTop: 8, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           {body}
         </div>
       )}
