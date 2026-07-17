@@ -84,9 +84,16 @@ export function ShareLineChart({
   const last = clipped[0].points[clipped[0].points.length - 1]?.date ?? "";
   const fmtV = (v: number) => `${prefix}${fmtShare(v)}${suffix}`;
 
+  // Fill the slot SocialCard gives us instead of asserting a pixel height.
+  // `height` is now the chart's NATURAL height (the viewBox), not a promise the
+  // card can honour: the body slot is only ~190-240px once the hero number and
+  // context have taken their share, so a fixed 235px SVG used to paint straight
+  // through the watermark. The svg holder is flex:1, and preserveAspectRatio
+  // scales the chart down to fit whatever is left. Roomy cards render it at full
+  // size; tight ones shrink it. Either way it is complete and inside the canvas.
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", gap: 22, flexWrap: "wrap", fontFamily: "var(--font-mono)", fontSize: 15 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
+      <div style={{ flexShrink: 0, display: "flex", gap: 22, flexWrap: "wrap", fontFamily: "var(--font-mono)", fontSize: 15 }}>
         {clipped.map((s) => {
           const end = s.points[s.points.length - 1]?.value ?? 0;
           return (
@@ -98,7 +105,8 @@ export function ShareLineChart({
           );
         })}
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style={{ display: "block" }}>
         {ticks.map((v, i) => (
           <g key={i}>
             <line x1={PAD.left} x2={W - PAD.right} y1={y(v)} y2={y(v)} stroke="var(--card-line)" strokeWidth={1} />
@@ -166,6 +174,7 @@ export function ShareLineChart({
         <text x={W - PAD.right} y={H - 8} textAnchor="end" fontFamily="var(--font-mono)" fontSize="13" fill="var(--ink-40)">{last}</text>
         {n < 2 && null}
       </svg>
+      </div>
     </div>
   );
 }
