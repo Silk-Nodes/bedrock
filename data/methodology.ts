@@ -130,11 +130,11 @@ export const COHORT_PRIORITY = [
 //   2. the history cursor walks forward from genesis and is still crossing the
 //      2022-2025 middle. Anything spanning that gap is incomplete and says so.
 export const COVERAGE = {
-  as_of: "2026-07-15",
+  as_of: "2026-07-16",
 
   genesis_height: 5_200_791,      // cosmoshub-4 genesis
-  chain_tip: 32_041_982,          // chain head at as_of
-  history_cursor: 14_692_405,     // backfill has reached this height, walking forward
+  chain_tip: 32_068_512,          // chain head at as_of
+  history_cursor: 15_496_135,     // backfill has reached this height, walking forward
   tip_lag_blocks: 3,              // the live cursor's distance from the head
 
   // continuous, gap-free window served by the tip follower
@@ -147,11 +147,13 @@ export const COVERAGE = {
   pct_volume_unknown_both_sides_30d: 31.0,
   pct_volume_unknown_one_side_30d: 45.0,
 
-  // curated label registry, served live at /labels
-  labels_active: 88,
+  // curated label registry, served live at /labels. 2026-07-16: +16 CEX labels
+  // contributed by Cosmos Labs (1 high, 15 inferred), chain-of-custody verified
+  // before import. The /labels page reads the live count; these are the stamp.
+  labels_active: 104,
   labels_certain: 15,
-  labels_high: 28,
-  labels_inferred: 45,
+  labels_high: 29,
+  labels_inferred: 60,
 };
 
 // Windows in which the Cosmos Hub produced NO BLOCKS.
