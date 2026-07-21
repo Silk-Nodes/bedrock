@@ -18,5 +18,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss": "^8.5.20"
+    }
   }
 }
