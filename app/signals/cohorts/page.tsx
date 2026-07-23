@@ -102,7 +102,20 @@ export default async function CohortsPage() {
   // data for (the historical backfill is still filling the middle years), so a
   // hardcoded "16 weeks" would overstate the sample on every card.
   const nWeeks = f.weeks.length;
-  const weeksLabel = `${nWeeks} week${nWeeks === 1 ? "" : "s"}`;
+  // The newest bucket is usually still filling: a week is only complete once 7
+  // days have passed. Rendered like a full week it reads as a collapse in the
+  // trend (a 3-day bar beside 7-day bars), so it is hatched in the chart and
+  // called out in the label rather than quietly drawn as if it were finished.
+  const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const lastWeekStart = new Date(f.weeks[f.weeks.length - 1].week).getTime();
+  const partialIdx = Date.now() < lastWeekStart + WEEK_MS ? f.weeks.length - 1 : undefined;
+  const partialDays =
+    partialIdx === undefined ? 0 : Math.max(1, Math.min(7, Math.ceil((Date.now() - lastWeekStart) / 86_400_000)));
+  const completeWeeks = partialIdx === undefined ? nWeeks : nWeeks - 1;
+  const weeksLabel =
+    partialIdx === undefined
+      ? `${nWeeks} week${nWeeks === 1 ? "" : "s"}`
+      : `${completeWeeks} full week${completeWeeks === 1 ? "" : "s"} + ${partialDays}d`;
   const accumulating = f.cohorts.filter((co) => co.net > 0);
   const distributing = f.cohorts.filter((co) => co.net < 0);
   // Largest single distributor and accumulator, for the narrative.
@@ -189,11 +202,11 @@ export default async function CohortsPage() {
           {/* Weekly two-sided. Sized to fill the card so this column matches the
               cohort panel's height exactly: no dead space below the charts. */}
           <div className="span-6">
-            <IntelCard title="Weekly · net stance" meta="above zero = accumulation · below = distribution" shareFilename="bedrock-weekly-stance" share={{ title: "Weekly net stance · Cosmos HUB", subtitle: "Accumulation vs distribution, week by week", big: fmtSigned(overall), unit: `ATOM · ${nWeeks}w`, deltaPositive: overall >= 0, context: "Combined net exchange flow and net staking per week. Above zero = the holder base accumulated that week.", body: <ShareColumns height={190} positiveColor={ACC} negativeColor={DIST} points={f.weeks.map((w) => ({ label: fmtWeek(w.week), value: w.net }))} /> }}>
+            <IntelCard title="Weekly · net stance" meta={`above zero = accumulation · below = distribution${partialIdx !== undefined ? " · last bar is the current week, still filling" : ""}`} shareFilename="bedrock-weekly-stance" share={{ title: "Weekly net stance · Cosmos HUB", subtitle: "Accumulation vs distribution, week by week", big: fmtSigned(overall), unit: `ATOM · ${weeksLabel}`, deltaPositive: overall >= 0, context: "Combined net exchange flow and net staking per week. Above zero = the holder base accumulated that week.", body: <ShareColumns height={190} positiveColor={ACC} negativeColor={DIST} points={f.weeks.map((w) => ({ label: fmtWeek(w.week), value: w.net }))} /> }}>
               <div style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", height: "calc(100% - 30px)", gap: 14 }}>
                 <WeeklyFlowChart
                   series={[{ label: "Net stance", color: ACC, points: f.weeks.map((w) => ({ date: fmtWeek(w.week), value: w.net })) }]}
-                  colorBySign height={300} yLabel="ATOM"
+                  colorBySign height={300} yLabel="ATOM" partialIndex={partialIdx}
                 />
                 <div style={{ borderTop: "1px solid var(--card-line)", paddingTop: 14 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -208,7 +221,7 @@ export default async function CohortsPage() {
                       { label: "Net exchange", color: "var(--hub)", points: f.weeks.map((w) => ({ date: fmtWeek(w.week), value: w.netExchange })) },
                       { label: "Net staked", color: "var(--moss)", points: f.weeks.map((w) => ({ date: fmtWeek(w.week), value: w.netStaked })) },
                     ]}
-                    height={260} yLabel="ATOM"
+                    height={260} yLabel="ATOM" partialIndex={partialIdx}
                   />
                 </div>
               </div>

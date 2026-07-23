@@ -28,6 +28,7 @@ export function WeeklyFlowChart({
   negColor = "var(--iron)",
   highlightMax = false,
   yLabel,
+  partialIndex,
 }: {
   series: FlowSeries[];
   height?: number;
@@ -36,6 +37,11 @@ export function WeeklyFlowChart({
   negColor?: string;
   highlightMax?: boolean; // amber the biggest bar (peak day), colorBySign mode
   yLabel?: string;
+  // Index of a bucket that is still filling (the in-progress week). It renders
+  // hatched and dimmed and its tooltip says so, because a 3-day bucket drawn
+  // identically to a 7-day one reads as a collapse in the trend rather than an
+  // incomplete period. Undefined = every bucket is complete.
+  partialIndex?: number;
 }) {
   const H = height;
   const dates = series[0]?.points.map((p) => p.date) ?? [];
@@ -74,6 +80,9 @@ export function WeeklyFlowChart({
         valueColor: v >= 0 ? posColor : negColor,
       };
     });
+    if (i === partialIndex) {
+      rows.push({ label: "week", value: "still in progress", valueColor: "var(--sand)" });
+    }
     if (colorBySign) {
       const v = series[0]?.points[i]?.value ?? 0;
       rows.push({ label: "week reads as", value: v >= 0 ? "accumulation" : "distribution", valueColor: v >= 0 ? posColor : negColor, total: true });
@@ -103,6 +112,12 @@ export function WeeklyFlowChart({
           <stop offset="0%" stopColor="color-mix(in srgb, var(--iron) 30%, transparent)" />
           <stop offset="100%" stopColor="var(--iron)" />
         </linearGradient>
+        {/* Hatch overlay for an in-progress bucket. Pattern rather than colour
+            alone, so the "incomplete" read survives greyscale and colourblindness. */}
+        <pattern id="wf-partial" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="5" height="5" fill="var(--paper)" fillOpacity={0.55} />
+          <line x1="0" y1="0" x2="0" y2="5" stroke="var(--paper)" strokeWidth="2.5" strokeOpacity={0.9} />
+        </pattern>
       </defs>
 
       {/* y label + max/min ticks (minimal) */}
@@ -131,10 +146,15 @@ export function WeeklyFlowChart({
           const isPeak = highlightMax && p.value === maxVal && p.value > 0;
           const fill = isPeak ? "var(--sand)" : colorBySign ? (pos ? "url(#wf-up)" : "url(#wf-dn)") : s.color;
           const glow = isPeak ? "var(--sand)" : colorBySign ? (pos ? posColor : negColor) : s.color;
+          const isPartial = i === partialIndex;
           return (
-            <rect key={`${si}-${i}`} x={x} y={y} width={barW} height={h} rx={2}
-              fill={fill}
-              style={{ filter: `drop-shadow(0 0 5px color-mix(in srgb, ${glow} 45%, transparent))` }} />
+            <g key={`${si}-${i}`}>
+              <rect x={x} y={y} width={barW} height={h} rx={2}
+                fill={fill}
+                opacity={isPartial ? 0.5 : 1}
+                style={isPartial ? undefined : { filter: `drop-shadow(0 0 5px color-mix(in srgb, ${glow} 45%, transparent))` }} />
+              {isPartial && <rect x={x} y={y} width={barW} height={h} rx={2} fill="url(#wf-partial)" />}
+            </g>
           );
         })
       )}
