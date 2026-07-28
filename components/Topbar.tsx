@@ -29,8 +29,17 @@ const SECTIONS: Section[] = [
     color: "var(--hub-2)",
     children: [
       { label: "Board", href: "/signals" },
-      { label: "Whales", href: "/signals/whales" },
+      { label: "Big movers", href: "/signals/whales" },
       { label: "Accumulation vs distribution", href: "/signals/cohorts" },
+    ],
+  },
+  {
+    label: "Rich List",
+    href: "/rich-list",
+    color: "var(--hub-2)",
+    children: [
+      { label: "Top holders", href: "/rich-list" },
+      { label: "Activity", href: "/rich-list/activity" },
     ],
   },
   {
