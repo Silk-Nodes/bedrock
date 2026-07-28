@@ -4,6 +4,12 @@
 
 import { getLiveAtomPrice } from "@/lib/price";
 
+// PROVENANCE: confirmed by the operator (2026-07-23). Corroborated on-chain:
+// "Delegation program 1" delegates across 73 distinct validators over 219
+// events, which is what a foundation delegation program looks like, and the two
+// previous-treasury wallets hold liquid ATOM with no staking activity.
+// These four addresses are also mirrored into address_labels as category
+// 'treasury' so ICF movements surface in flow analytics; keep the two in sync.
 export const ICF_WALLETS = [
   { label: "ICF · Delegation program 1", address: "cosmos1ts4vwmfccwjv0vehlzd4x5rw5xzljjnhgm7gnz" },
   { label: "ICF · Delegation program 2", address: "cosmos1f3vdsge09avpxsym5233xgskwv2q5s3cg57dcs" },

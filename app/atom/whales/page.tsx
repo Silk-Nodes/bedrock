@@ -148,6 +148,8 @@ export default async function WhalesPage() {
                 moved a meaningful share onto exchanges. Together they hold{" "}
                 <strong style={{ color: "var(--ink)" }}>{compact(top100Atom)} ATOM</strong>
                 {price > 0 ? <> worth <strong style={{ color: "var(--ink)" }}>{usd(top100Usd)}</strong> at today&rsquo;s price</> : null}.
+                {" "}This is the <strong style={{ color: "var(--ink)" }}>character</strong> read &mdash; vintage, conviction, who they are.
+                For what each is <a href="/rich-list" style={{ color: "var(--hub-2)" }}>doing right now (live flows, sorting, profiles)</a>, see the Rich List.
                 Vintage comes from the auth account number; behavior from indexed staking + transfers, accurate within the backfilled range.
               </p>
             </IntelCard>
@@ -224,7 +226,7 @@ export default async function WhalesPage() {
                 context: `Worth ${usd(top100Usd)} at today's price. ${genesis} genesis-era, ${diamond} fully staked, ${sellers} showing sell intent.`,
                 body: <ShareBars rows={rows.slice(0, 8).map((r) => ({ label: short(r.address), value: r.atom, note: `· ${behavior(r).tag}` }))} />,
               }}>
-              <div style={{ overflowX: "auto" }}>
+              <div className="bigtable-wrap">
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
                   <thead>
                     <tr style={{ textAlign: "left", color: "var(--ink-40)", fontSize: 10, letterSpacing: 0.8, textTransform: "uppercase" }}>

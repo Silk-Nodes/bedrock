@@ -54,7 +54,7 @@ function AddrCell({ a }: { a: string }) {
   return <span style={{ color: "var(--ink-60)" }}>{shortAddr(a)}</span>;
 }
 
-export const metadata = seo({ title: "Whale Signals", description: "Track the largest ATOM wallets in real time: accumulation, distribution, and exchange-bound transfers from the top Cosmos Hub holders.", path: "/signals/whales", keywords: ["ATOM whales", "Cosmos Hub whale tracker", "large ATOM transfers"] });
+export const metadata = seo({ title: "Big Movers", description: "Track the largest ATOM wallets in real time: accumulation, distribution, and exchange-bound transfers from the top Cosmos Hub holders.", path: "/signals/whales", keywords: ["ATOM whales", "Cosmos Hub whale tracker", "large ATOM transfers"] });
 
 type StakeRow = { delegator: string; validator: string; valName: string; logo: string | null; atom: number; time: string };
 
@@ -152,7 +152,7 @@ export default async function SignalsWhales({ searchParams }: { searchParams: Pr
 
   return (
     <ConsolePage>
-      <ConsoleModule lead dot="var(--hub-2)" title="Signals · Whales" meta="biggest movers · live from the indexer">
+      <ConsoleModule lead dot="var(--hub-2)" title="Big movers" meta="biggest movers · live from the indexer">
         <div className="console-grid">
           <div className="span-4"><MetricCard label="Largest transfer" value={fmtCompact(largest)} unit="ATOM" series={[]} color="var(--hub)" footnote="biggest single flow" /></div>
           <div className="span-4"><MetricCard label="Whale moves" value={String(flows.length)} series={[]} color="var(--hub-2)" footnote={`≥ 10k ATOM · last ${feedLabel}`} /></div>

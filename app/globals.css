@@ -1695,3 +1695,21 @@ table.broadsheet tr.top td:first-child {
   .tipcard .tip-div { border-top: 1px solid var(--card-line); margin: 7px 0; }
   .tipcard .tip-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 0; }
 }
+
+/* Big-list tables (Rich List, Whale intelligence): page-level sticky header.
+   The <th> pin below the 122px sticky nav as you scroll the whole page, so the
+   column labels stay visible over a long list. NO overflow wrapper on desktop
+   (an overflow container would capture the scroll and anchor the sticky to
+   itself). Below 920px the wide column set can't fit, so the wrapper scrolls the
+   TABLE horizontally instead of the page (respecting no-horizontal-page-scroll);
+   the page-sticky degrades there, an acceptable narrow-screen tradeoff. */
+.bigtable-wrap thead th {
+  position: sticky;
+  top: 122px;
+  z-index: 3;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+@media (max-width: 920px) {
+  .bigtable-wrap { overflow-x: auto; }
+}

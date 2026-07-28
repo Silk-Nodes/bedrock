@@ -1082,3 +1082,123 @@ export async function getWalletFlowClass(address: string, days = 180): Promise<W
   }
 }
 
+
+// ── Whale board (top real holders + windowed flows) ─────────────────────────
+// Feeds /whales. Hits the indexer's /api/v1/whales/board (live aggregation over
+// the continuous window, exchange/treasury/protocol wallets already excluded).
+// Falls back to the preview fixture until that endpoint is deployed, so the page
+// renders during development — remove the fixture import once it's live.
+import { WHALE_BOARD_FIXTURE, type WhaleBoardRow } from "./whaleBoardFixture";
+export type WhaleBoard = { rows: WhaleBoardRow[]; since: string; live: boolean };
+
+export async function getWhaleBoard(limit = 100): Promise<WhaleBoard> {
+  try {
+    const res = await fetch(`${INDEXER_URL}/api/v1/whales/board?limit=${limit}`, { next: { revalidate: 300 } });
+    if (res.ok) {
+      const j = (await res.json()) as { whale_board?: { available?: boolean; since?: string; rows?: {
+        rank: number; address: string; uatom: string; staked_uatom: string; label: string;
+        delegate_uatom: string; unbond_uatom: string; claim_uatom: string; to_cex_uatom: string; from_cex_uatom: string;
+      }[] } };
+      const b = j.whale_board;
+      if (b?.available && b.rows?.length) {
+        const a = (s: string) => Math.round(Number(s) / 1e6);
+        return {
+          since: b.since ?? "2026-06-08",
+          live: true,
+          // The endpoint returns rows already ordered by holdings; pos is their
+          // 1-based position among real holders (rank-among-real-holders, so no
+          // gaps from excluded exchanges).
+          rows: b.rows.map((r, i) => ({
+            pos: i + 1, address: r.address, held: a(r.uatom), staked: a(r.staked_uatom),
+            label: r.label || null, delegated: a(r.delegate_uatom), undelegated: a(r.unbond_uatom),
+            claimed: a(r.claim_uatom), toCex: a(r.to_cex_uatom), fromCex: a(r.from_cex_uatom),
+          })),
+        };
+      }
+    }
+  } catch {
+    // fall through to fixture
+  }
+  return { rows: WHALE_BOARD_FIXTURE.slice(0, limit), since: "2026-06-08", live: false };
+}
+
+// ── Whale events (significant moves by top real holders) ────────────────────
+// Feeds /rich-list/activity from the indexer's /api/v1/whales/events.
+export type WhaleEvent = {
+  address: string; label: string | null; kind: string;
+  atom: number; pctHeld: number; height: number; ts: string; txHash: string;
+};
+export type WhaleEvents = { rows: WhaleEvent[]; days: number; live: boolean };
+
+export async function getWhaleEvents(days = 14, limit = 60): Promise<WhaleEvents> {
+  try {
+    const res = await fetch(`${INDEXER_URL}/api/v1/whales/events?days=${days}&limit=${limit}`, { next: { revalidate: 120 } });
+    if (res.ok) {
+      const j = (await res.json()) as { whale_events?: { available?: boolean; days?: number; rows?: {
+        address: string; label: string; kind: string; atom: number; pct_held: number; height: number; ts: string; tx_hash: string;
+      }[] } };
+      const w = j.whale_events;
+      if (w?.available && w.rows?.length) {
+        return {
+          days: w.days ?? days,
+          live: true,
+          rows: w.rows.map((r) => ({
+            address: r.address, label: r.label || null, kind: r.kind,
+            atom: r.atom, pctHeld: r.pct_held, height: r.height, ts: r.ts, txHash: r.tx_hash,
+          })),
+        };
+      }
+    }
+  } catch {
+    // fall through
+  }
+  return { rows: [], days, live: false };
+}
+
+// ── Exchange-linked holders (Rich List "Exchange" tab) ─────────────────────
+// The mirror of getWhaleBoard: the wallets the Rich List excludes, so custodied
+// ATOM is shown rather than silently hidden. This is customer deposits an
+// exchange holds the keys to, NOT the exchange's own treasury — the UI says so.
+export type ExchangeHolderRow = { address: string; venue: string; category: string; held: number; staked: number };
+export type ExchangeVenue = { venue: string; wallets: number; held: number; staked: number; rows: ExchangeHolderRow[] };
+export type ExchangeHolders = { venues: ExchangeVenue[]; total: number; totalStaked: number; wallets: number; day: string; live: boolean };
+
+export async function getExchangeHolders(): Promise<ExchangeHolders> {
+  const empty: ExchangeHolders = { venues: [], total: 0, totalStaked: 0, wallets: 0, day: "", live: false };
+  try {
+    const res = await fetch(`${INDEXER_URL}/api/v1/whales/exchange-holders?limit=200`, { next: { revalidate: 600 } });
+    if (!res.ok) return empty;
+    const j = (await res.json()) as { exchange_holders?: { available?: boolean; day?: string; rows?: {
+      address: string; venue: string; category: string; uatom: string; staked_uatom: string;
+    }[] } };
+    const e = j.exchange_holders;
+    if (!e?.available || !e.rows?.length) return empty;
+    const a = (s: string) => Math.round(Number(s) / 1e6);
+    const rows: ExchangeHolderRow[] = e.rows.map((r) => ({
+      address: r.address, venue: r.venue || "Unknown exchange", category: r.category,
+      held: a(r.uatom), staked: a(r.staked_uatom),
+    }));
+    // Group by venue, biggest venue first, wallets within a venue biggest first.
+    const byVenue = new Map<string, ExchangeHolderRow[]>();
+    for (const r of rows) byVenue.set(r.venue, [...(byVenue.get(r.venue) ?? []), r]);
+    const venues: ExchangeVenue[] = [...byVenue.entries()]
+      .map(([venue, vr]) => ({
+        venue,
+        wallets: vr.length,
+        held: vr.reduce((s, x) => s + x.held, 0),
+        staked: vr.reduce((s, x) => s + x.staked, 0),
+        rows: [...vr].sort((x, y) => y.held - x.held),
+      }))
+      .sort((x, y) => y.held - x.held);
+    return {
+      venues,
+      total: rows.reduce((s, r) => s + r.held, 0),
+      totalStaked: rows.reduce((s, r) => s + r.staked, 0),
+      wallets: rows.length,
+      day: e.day ?? "",
+      live: true,
+    };
+  } catch {
+    return empty;
+  }
+}

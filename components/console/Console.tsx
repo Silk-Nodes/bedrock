@@ -29,7 +29,7 @@ export function ConsoleModule({
   headingLevel,
   children,
 }: {
-  title?: string;
+  title?: React.ReactNode;
   meta?: string;
   tools?: React.ReactNode;
   dot?: string;

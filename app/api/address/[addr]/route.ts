@@ -218,6 +218,10 @@ export async function GET(_req: Request, ctx: { params: Promise<{ addr: string }
     address: addr,
     live: true,
     block,
+    // The subject wallet's own label, so the profile page and drawer can show
+    // "Interchain Foundation" / "Binance" in the header instead of just "Wallet".
+    label: labelByAddr.get(addr)?.label ?? null,
+    category: labelByAddr.get(addr)?.category ?? null,
     price_usd: price.usd,
     total_atom: Math.round(total),
     total_usd: Math.round(total * price.usd),

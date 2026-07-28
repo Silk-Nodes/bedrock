@@ -22,6 +22,7 @@ const CATEGORY_META: { key: string; title: string; blurb: string; color: string 
   { key: "cex_ops", title: "Exchange operational wallets", blurb: "Exchange-controlled wallets: validator operator accounts (key identity) and traced staking-ops wallets.", color: "var(--moss)" },
   { key: "cex", title: "Exchange hot / deposit wallets", blurb: "Customer-facing exchange wallets verified by chain-of-custody or first-party disclosure.", color: "var(--iron)" },
   { key: "cex_custody", title: "Exchange staking custody", blurb: "Customer ATOM delegated to an exchange's own validator, from its on-chain delegator set.", color: "var(--sand)" },
+  { key: "treasury", title: "Treasury", blurb: "Interchain Foundation delegation-program and previous-treasury wallets, holdings verified live on-chain. Labelled so treasury movements surface in flow analytics like any other entity instead of sitting unattributed.", color: "var(--hub-2)" },
 ];
 
 function short(a: string): string {
