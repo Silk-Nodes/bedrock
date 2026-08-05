@@ -103,7 +103,7 @@ export async function GET() {
           <div style={{ display: "flex", alignItems: "flex-end", marginTop: 26 }}>
             <div style={{ display: "flex", flexDirection: "column", width: 300 }}>
               <div style={{ display: "flex", fontFamily: MONO, fontSize: 17, color: OG.faint, width: 290, lineHeight: 1.5 }}>
-                net staked exceeds rewards by 1.05M — new capital, not recycled yield
+                net staked exceeds rewards by 1.05M. new capital, not recycled yield
               </div>
             </div>
             <div style={{ display: "flex", flexDirection: "column", marginLeft: 18 }}>
