@@ -1,6 +1,7 @@
 // POST /api/feedback/vote → toggle a vote. Body: { request_id }.
 import { NextResponse } from "next/server";
 import { getVoter, setVoter, clientIp, INDEXER_URL } from "@/lib/feedback/voter";
+import { ixFetch } from "@/lib/indexer";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -11,7 +12,7 @@ export async function POST(req: Request) {
   let body: unknown;
   try { body = await req.json(); } catch { return NextResponse.json({ error: "invalid-json" }, { status: 400 }); }
   try {
-    const r = await fetch(`${INDEXER_URL}/api/v1/feedback/vote?voter=${encodeURIComponent(voterId)}&ip=${encodeURIComponent(ip)}`, {
+    const r = await ixFetch(`${INDEXER_URL}/api/v1/feedback/vote?voter=${encodeURIComponent(voterId)}&ip=${encodeURIComponent(ip)}`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), cache: "no-store",
     });
     const data = await r.json();
