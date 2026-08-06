@@ -6,6 +6,21 @@ import { unstable_cache } from "next/cache";
 
 const INDEXER_URL = process.env.BEDROCK_INDEXER_URL || "http://127.0.0.1:8080";
 
+// Every call to the indexer carries the site's service key. The indexer
+// requires a key on all /api/v1 routes except /healthz, so without this the
+// entire site 401s. The key is server-side only (BEDROCK_INDEXER_KEY, never
+// NEXT_PUBLIC_) and must never be sent to the browser: the public proxy at
+// /api/v1/[...path] forwards the EXTERNAL caller's key instead of this one.
+export async function ixFetch(url: string, init?: RequestInit): Promise<Response> {
+  const key = process.env.BEDROCK_INDEXER_KEY;
+  if (!key) return fetch(url, init);
+  return fetch(url, {
+    ...init,
+    headers: { ...((init?.headers as Record<string, string>) ?? {}), "X-API-Key": key },
+  });
+}
+
+
 export type ActivityEvent = {
   time: string;
   height: number;
@@ -21,7 +36,7 @@ export async function getAddressActivity(
   limit = 40,
 ): Promise<{ events: ActivityEvent[]; live: boolean }> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/address/${addr}/activity?limit=${limit}`, {
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/address/${addr}/activity?limit=${limit}`, {
       next: { revalidate: 60 },
     });
     if (!res.ok) return { events: [], live: false };
@@ -52,7 +67,7 @@ export type AddressSummary = {
 
 export async function getAddressSummary(addr: string): Promise<AddressSummary | null> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/address/${addr}/summary`, {
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/address/${addr}/summary`, {
       next: { revalidate: 120 },
     });
     if (!res.ok) return null;
@@ -80,7 +95,7 @@ export type StakingNetFlow = {
 export async function getStakingNetFlow(hours = 168): Promise<StakingNetFlow> {
   const empty = { net_atom: 0, delegate_atom: 0, unbond_atom: 0, redelegate_atom: 0, window_start: null, window_end: null, events: 0, live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/staking/netflow?hours=${hours}`, { next: { revalidate: 120 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/staking/netflow?hours=${hours}`, { next: { revalidate: 120 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as {
       net_uatom?: string; delegate_uatom?: string; unbond_uatom?: string; redelegate_uatom?: string;
@@ -116,7 +131,7 @@ export type StakingEvent = {
 export type StakingRecent = { events: StakingEvent[]; live: boolean };
 export async function getStakingRecent(minAtom = 1, limit = 40): Promise<StakingRecent> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/staking/recent?min=${minAtom}&limit=${limit}`, { next: { revalidate: 30 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/staking/recent?min=${minAtom}&limit=${limit}`, { next: { revalidate: 30 } });
     if (!res.ok) return { events: [], live: false };
     const j = (await res.json()) as {
       events?: { time: string; height: number; tx_hash: string; type: string; delegator: string; validator: string; validator_dst: string; amount_uatom: string }[];
@@ -151,7 +166,7 @@ export async function getStakingFeed(
 ): Promise<StakingFeed> {
   const { minAtom = 0, type = "all", hours = 168, limit = 60 } = opts;
   try {
-    const res = await fetch(
+    const res = await ixFetch(
       `${INDEXER_URL}/api/v1/staking/feed?min=${minAtom}&type=${encodeURIComponent(type)}&hours=${hours}&limit=${limit}`,
       { next: { revalidate: 30 } },
     );
@@ -191,7 +206,7 @@ export type IndexerStatus = {
 export async function getIndexerStatus(): Promise<IndexerStatus> {
   const empty: IndexerStatus = { last_height: 0, tip_height: 0, pct: 0, events_session: 0, tip_lag: 0, tip_live: false, live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/status`, { next: { revalidate: 60 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/status`, { next: { revalidate: 60 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as {
       last_indexed_height?: number; chain_tip_height?: number; events_processed_session?: number;
@@ -237,7 +252,7 @@ export async function getIndexerStatus(): Promise<IndexerStatus> {
 // block the site had definitely indexed, never one it had not reached yet.
 async function fetchShareBlock(): Promise<number> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/status`, { cache: "no-store" });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/status`, { cache: "no-store" });
     if (!res.ok) return 0;
     const j = (await res.json()) as { tip_follower?: { last_indexed_height?: number } };
     return j.tip_follower?.last_indexed_height ?? 0;
@@ -267,7 +282,7 @@ export type RewardClaims = {
 export async function getRewardClaims(hours = 168, limit = 10): Promise<RewardClaims> {
   const empty: RewardClaims = { total_atom: 0, events: 0, window_start: null, window_end: null, top: [], live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/stakers/rewards?hours=${hours}&limit=${limit}`, { next: { revalidate: 120 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/stakers/rewards?hours=${hours}&limit=${limit}`, { next: { revalidate: 120 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as { total_uatom?: string; events?: number; window_start?: string | null; window_end?: string | null; top?: { address: string; total_uatom: string; count: number }[] };
     return {
@@ -288,7 +303,7 @@ export type ValidatorFlow = { window_start: string | null; window_end: string | 
 export async function getValidatorFlow(hours = 168, limit = 300): Promise<ValidatorFlow> {
   const empty: ValidatorFlow = { window_start: null, window_end: null, rows: [], live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/validators/flow?hours=${hours}&limit=${limit}`, { next: { revalidate: 120 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/validators/flow?hours=${hours}&limit=${limit}`, { next: { revalidate: 120 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as { window_start?: string | null; window_end?: string | null; rows?: { validator: string; net_uatom: string; delegate_uatom: string; unbond_uatom: string }[] };
     return {
@@ -315,7 +330,7 @@ export type ExchangeFlowDay = {
 // days=0 returns all indexed history (currently the 2021 era + the live tip).
 export async function getExchangeFlow(days = 0): Promise<{ rows: ExchangeFlowDay[]; live: boolean }> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/exchanges/flow?days=${days}&limit=4000`, { next: { revalidate: 1800 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/exchanges/flow?days=${days}&limit=4000`, { next: { revalidate: 1800 } });
     if (!res.ok) return { rows: [], live: false };
     const j = (await res.json()) as { rows?: { day: string; entity: string; deposit_uatom: string; withdraw_uatom: string; deposit_count: number; withdraw_count: number }[] };
     return {
@@ -374,7 +389,7 @@ export type SellPressure = {
 export async function getSellPressure(days = 120, bucket = 7, basis: "gross" | "retail" = "gross"): Promise<SellPressure> {
   const empty: SellPressure = { bucket_days: bucket, series: [], actors: [], bursts: [], top_senders: [], by_exchange: [], total: 0, top10: 0, top50: 0, deposit_count: 0, unique_senders: 0, memo_deposits: 0, memo_deposit_total: 0, basis, weighted_total: 0, routes: [], live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/exchanges/sell-pressure?days=${days}&bucket=${bucket}&basis=${basis}`, { next: { revalidate: 600 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/exchanges/sell-pressure?days=${days}&bucket=${bucket}&basis=${basis}`, { next: { revalidate: 600 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as { sell_pressure?: {
       bucket_days: number;
@@ -425,7 +440,7 @@ export type InflationRealization = {
 export async function getInflationRealization(weeks = 12, basis: "gross" | "retail" = "gross"): Promise<InflationRealization> {
   const empty: InflationRealization = { basis, weeks: [], withdrawn: 0, sold: 0, restaked: 0, liquid: 0, live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/inflation/realization?weeks=${weeks}&basis=${basis}`, { next: { revalidate: 600 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/inflation/realization?weeks=${weeks}&basis=${basis}`, { next: { revalidate: 600 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as { realization?: {
       basis: string;
@@ -453,7 +468,7 @@ export async function getInflationRealization(weeks = 12, basis: "gross" | "reta
 export type IssuancePoint = { ts: string; minted_atom: number; inflation_pct: number; bonded_pct: number; blocks: number };
 export async function getIssuance(days = 120, bucket = 1): Promise<{ series: IssuancePoint[]; live: boolean }> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/issuance/daily?days=${days}&bucket=${bucket}`, { next: { revalidate: 300 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/issuance/daily?days=${days}&bucket=${bucket}`, { next: { revalidate: 300 } });
     if (!res.ok) return { series: [], live: false };
     const j = (await res.json()) as { issuance?: { series?: { ts: string; minted_uatom: string; inflation_pct: number; bonded_ratio_pct: number; blocks: number }[] } };
     const s = j.issuance?.series ?? [];
@@ -483,7 +498,7 @@ export type ProposalVelocity = {
 export async function getProposalVelocity(id: string): Promise<ProposalVelocity> {
   const empty: ProposalVelocity = { cumulative: [], recorded: 0, yes: 0, against: 0, first_ts: "", last_ts: "", live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/governance/${id}/votes`, { next: { revalidate: 120 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/governance/${id}/votes`, { next: { revalidate: 120 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as { votes?: { option?: number; ts?: string }[]; count?: number };
     const votes = (j.votes ?? []).filter((v) => v.ts).sort((a, b) => ((a.ts as string) < (b.ts as string) ? -1 : 1));
@@ -529,7 +544,7 @@ export type IbcOutbound = {
 export async function getIbcOutbound(hours = 168, limit = 12): Promise<IbcOutbound> {
   const empty: IbcOutbound = { total_atom: 0, events: 0, window_start: null, window_end: null, dests: [], live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/ibc/outbound?hours=${hours}&limit=${limit}`, { next: { revalidate: 120 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/ibc/outbound?hours=${hours}&limit=${limit}`, { next: { revalidate: 120 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as {
       total_uatom?: string; events?: number; window_start?: string | null; window_end?: string | null;
@@ -587,7 +602,7 @@ export function spanLabel(start: string | null, end: string | null): string {
 // = moving off (accumulation). High+ confidence labels only.
 export async function getExchangeNetFlow(hours = 168): Promise<{ rows: ExchangeNetFlowRow[]; hours: number; live: boolean }> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/exchanges/netflow?hours=${hours}`, { next: { revalidate: 300 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/exchanges/netflow?hours=${hours}`, { next: { revalidate: 300 } });
     if (!res.ok) return { rows: [], hours, live: false };
     const j = (await res.json()) as { hours?: number; rows?: { entity: string; deposit_uatom: string; withdraw_uatom: string; deposit_count: number; withdraw_count: number }[] };
     return {
@@ -610,7 +625,7 @@ export type CustodyHistoryPoint = { day: string; entity: string; bonded_atom: nu
 // snapshotter began. Returns points oldest-first; few/zero until it accrues.
 export async function getCustodyHistory(days = 90): Promise<{ points: CustodyHistoryPoint[]; live: boolean }> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/custody/history?days=${days}`, { next: { revalidate: 1800 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/custody/history?days=${days}`, { next: { revalidate: 1800 } });
     if (!res.ok) return { points: [], live: false };
     const j = (await res.json()) as { points?: { day: string; entity: string; bonded_uatom: string }[] };
     return {
@@ -634,7 +649,7 @@ export type LabelRow = {
 // entities" set), from the indexer.
 export async function getLabels(): Promise<{ labels: LabelRow[]; live: boolean }> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/labels`, { next: { revalidate: 600 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/labels`, { next: { revalidate: 600 } });
     if (!res.ok) return { labels: [], live: false };
     const j = (await res.json()) as { labels?: LabelRow[] };
     return { labels: j.labels ?? [], live: true };
@@ -715,7 +730,7 @@ export async function getRecentFlows(
   limit = 50,
 ): Promise<{ flows: RecentFlow[]; live: boolean }> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/flows/recent?min=${minAtom}&limit=${limit}`, {
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/flows/recent?min=${minAtom}&limit=${limit}`, {
       next: { revalidate: 30 },
     });
     if (!res.ok) return { flows: [], live: false };
@@ -757,7 +772,7 @@ export type Holders = {
 export async function getHolders(): Promise<Holders> {
   const empty: Holders = { available: false, latest: null, history: [], top: [] };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/holders`, { next: { revalidate: 600 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/holders`, { next: { revalidate: 600 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as {
       holders?: {
@@ -836,7 +851,7 @@ export type WhaleIntel = { available: boolean; day: string; rows: WhaleRow[] };
 export async function getWhaleIntel(limit = 100): Promise<WhaleIntel> {
   const empty: WhaleIntel = { available: false, day: "", rows: [] };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/holders/whales?limit=${limit}`, { next: { revalidate: 600 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/holders/whales?limit=${limit}`, { next: { revalidate: 600 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as {
       whales?: {
@@ -887,7 +902,7 @@ export type NewsItem = {
 };
 export async function getNews(limit = 25): Promise<{ items: NewsItem[]; live: boolean }> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/news?limit=${limit}`, { next: { revalidate: 300 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/news?limit=${limit}`, { next: { revalidate: 300 } });
     if (!res.ok) return { items: [], live: false };
     const j = (await res.json()) as { items?: NewsItem[] };
     return { items: j.items ?? [], live: true };
@@ -915,7 +930,7 @@ export type CohortSellPressure = {
 export async function getCohortSellPressure(weeks = 12): Promise<CohortSellPressure> {
   const empty: CohortSellPressure = { cohorts: [], series: [], totals: [], weeks: [], total: 0, median_week: 0, burst_factor: 1.8, live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/signals/cohort-sell-pressure?weeks=${weeks}`, { next: { revalidate: 600 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/signals/cohort-sell-pressure?weeks=${weeks}`, { next: { revalidate: 600 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as { cohort_sell_pressure?: {
       cohorts: string[];
@@ -961,7 +976,7 @@ export type CohortFlows = {
 export async function getCohortFlows(weeks = 16): Promise<CohortFlows> {
   const empty: CohortFlows = { cohorts: [], weeks: [], sold: 0, bought: 0, staked: 0, unstaked: 0, netExchange: 0, netStaked: 0, net: 0, live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/signals/cohort-flows?weeks=${weeks}`, { next: { revalidate: 600 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/signals/cohort-flows?weeks=${weeks}`, { next: { revalidate: 600 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as { cohort_flows?: {
       cohorts: { cohort: string; sold_uatom: string; bought_uatom: string; staked_uatom: string; unstaked_uatom: string }[];
@@ -1006,7 +1021,7 @@ export async function getRewardBehavior(): Promise<RewardBehavior> {
   const zw: RewardWindow = { claims: 0, claimers: 0, atom: 0 };
   const empty: RewardBehavior = { w24h: zw, w7d: zw, w30d: zw, tiers: [], live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/stakers/reward-behavior`, { next: { revalidate: 600 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/stakers/reward-behavior`, { next: { revalidate: 600 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as { reward_behavior?: {
       w24h: { claims: number; claimers: number; uatom: string };
@@ -1039,7 +1054,7 @@ export type RewardDailyPoint = { day: string; atom: number; claims: number };
 
 export async function getRewardDaily(days = 30): Promise<{ points: RewardDailyPoint[]; live: boolean }> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/stakers/reward-daily?days=${days}`, { next: { revalidate: 600 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/stakers/reward-daily?days=${days}`, { next: { revalidate: 600 } });
     if (!res.ok) return { points: [], live: false };
     const j = (await res.json()) as { reward_daily?: { day: string; uatom: string; claims: number }[] };
     return { points: (j.reward_daily ?? []).map((r) => ({ day: r.day, atom: Number(r.uatom) / 1e6, claims: r.claims })), live: true };
@@ -1061,7 +1076,7 @@ export type WalletFlowClass = {
 export async function getWalletFlowClass(address: string, days = 180): Promise<WalletFlowClass> {
   const empty: WalletFlowClass = { address, cls: "neutral", label: "", cex_out: 0, cex_in: 0, ibc_in: 0, other_in: 0, net: 0, net_with_other: 0, txns: 0, window_days: days, live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/wallets/flow-class?address=${encodeURIComponent(address)}&days=${days}`, { next: { revalidate: 300 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/wallets/flow-class?address=${encodeURIComponent(address)}&days=${days}`, { next: { revalidate: 300 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as { flow_class?: {
       address: string; class: string; label: string;
@@ -1093,7 +1108,7 @@ export type WhaleBoard = { rows: WhaleBoardRow[]; since: string; live: boolean }
 
 export async function getWhaleBoard(limit = 100): Promise<WhaleBoard> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/whales/board?limit=${limit}`, { next: { revalidate: 300 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/whales/board?limit=${limit}`, { next: { revalidate: 300 } });
     if (res.ok) {
       const j = (await res.json()) as { whale_board?: { available?: boolean; since?: string; rows?: {
         rank: number; address: string; uatom: string; staked_uatom: string; label: string;
@@ -1132,7 +1147,7 @@ export type WhaleEvents = { rows: WhaleEvent[]; days: number; live: boolean };
 
 export async function getWhaleEvents(days = 14, limit = 60): Promise<WhaleEvents> {
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/whales/events?days=${days}&limit=${limit}`, { next: { revalidate: 120 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/whales/events?days=${days}&limit=${limit}`, { next: { revalidate: 120 } });
     if (res.ok) {
       const j = (await res.json()) as { whale_events?: { available?: boolean; days?: number; rows?: {
         address: string; label: string; kind: string; atom: number; pct_held: number; height: number; ts: string; tx_hash: string;
@@ -1166,7 +1181,7 @@ export type ExchangeHolders = { venues: ExchangeVenue[]; total: number; totalSta
 export async function getExchangeHolders(): Promise<ExchangeHolders> {
   const empty: ExchangeHolders = { venues: [], total: 0, totalStaked: 0, wallets: 0, day: "", live: false };
   try {
-    const res = await fetch(`${INDEXER_URL}/api/v1/whales/exchange-holders?limit=200`, { next: { revalidate: 600 } });
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/whales/exchange-holders?limit=200`, { next: { revalidate: 600 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as { exchange_holders?: { available?: boolean; day?: string; rows?: {
       address: string; venue: string; category: string; uatom: string; staked_uatom: string;
@@ -1201,4 +1216,75 @@ export async function getExchangeHolders(): Promise<ExchangeHolders> {
   } catch {
     return empty;
   }
+}
+
+// What each active validator does with its commission over a window.
+//
+// READ THE CAVEATS BEFORE PUTTING A NUMBER ON SCREEN.
+//   `commission` is exact: it is the accrual from block-level distribution
+//   events, and over 30 days it reconciles to 98.0% of minted supply (the
+//   remainder is the 2% community tax).
+//   `toCex` is a FLOOR, not a measurement. It counts DIRECT transfers to a
+//   labeled exchange address only, so anyone routing through one intermediary
+//   is invisible to it. The same direct test on the staker side reported 8%
+//   where proportional multi-hop tracing reported 38.1%.
+//   `conduit` marks addresses whose inbound traffic exceeds twice the
+//   commission earned. Their balance is mostly pass-through money that is not
+//   commission, and including them produces ratios like 1918% of commission
+//   "sold". Always exclude them from a headline ratio.
+export type ValidatorCommissionRow = {
+  valoper: string;
+  moniker: string;
+  withdraw: string;
+  rate: number;
+  tokens: number;
+  redirected: boolean;
+  commission: number;
+  toCex: number;
+  delegated: number;
+  outTotal: number;
+  inTotal: number;
+  conduit: boolean;
+};
+
+export type ValidatorCommissionFlow = {
+  live: boolean;
+  days: number;
+  windowStart: string | null;
+  rows: ValidatorCommissionRow[];
+};
+
+export async function getValidatorCommissionFlow(days = 30): Promise<ValidatorCommissionFlow> {
+  try {
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/validators/commission-flow?days=${days}`, {
+      next: { revalidate: 600 },
+    });
+    if (res.ok) {
+      const j = (await res.json()) as {
+        days?: number;
+        window_start?: string;
+        validators?: {
+          valoper: string; moniker: string; withdraw: string; rate: number; tokens: number;
+          redirected: boolean; commission: number; to_cex: number; delegated: number;
+          out_total: number; in_total: number; conduit: boolean;
+        }[];
+      };
+      if (j.validators?.length) {
+        return {
+          live: true,
+          days: j.days ?? days,
+          windowStart: j.window_start ?? null,
+          rows: j.validators.map((v) => ({
+            valoper: v.valoper, moniker: v.moniker, withdraw: v.withdraw, rate: v.rate,
+            tokens: v.tokens, redirected: v.redirected, commission: v.commission,
+            toCex: v.to_cex, delegated: v.delegated, outTotal: v.out_total,
+            inTotal: v.in_total, conduit: v.conduit,
+          })),
+        };
+      }
+    }
+  } catch {
+    // fall through: the page renders its unavailable state rather than estimates
+  }
+  return { live: false, days, windowStart: null, rows: [] };
 }

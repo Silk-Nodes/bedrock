@@ -63,6 +63,12 @@
   /* Functional data colors */
   --moss:     #54E0A8;   /* positive */
   --iron:     #FF7E68;   /* negative */
+  /* Text cuts of the positive/negative tokens. --moss and --iron are tuned as
+     FILLS (bars, dots, borders); as small text on the light paper --moss only
+     reaches 4.45:1, just under the 4.5 floor. Numbers in tables use these
+     instead. On dark the fill values already clear 12:1, so they are the same. */
+  --moss-text: #54E0A8;
+  --iron-text: #FF7E68;
   --slate:    #9AA2B6;   /* neutral */
   --sand:     #E4C98F;   /* tertiary */
 
@@ -116,6 +122,8 @@
   /* functional colors darkened for WCAG AA on the light surface (verified) */
   --moss:     #147A55;
   --iron:     #B83D26;
+  --moss-text: #0F6647;   /* 5.83:1 on --paper, vs 4.45:1 for --moss */
+  --iron-text: #A8371F;   /* 5.43:1 on --paper, vs 4.70:1 for --iron */
   --slate:    #5A6275;
   --sand:     #756030;
 
