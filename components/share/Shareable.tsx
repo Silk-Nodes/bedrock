@@ -3,9 +3,10 @@
 // Shareable · wraps content and adds the camera affordance in the corner.
 // Click opens ShareModal with the provided SocialCard data.
 //
-// `reveal` (default true) hides the camera until the wrapped block is
-// hovered or focused, keeping dense surfaces clean. Pass reveal={false}
-// for a persistent camera (e.g. a page hero you always want shareable).
+// `reveal` (default false) shows the camera permanently. It used to default to
+// hover-only, which kept surfaces clean and made the feature undiscoverable:
+// cards had carried a camera for weeks without being noticed. Pass reveal
+// for the old fade-in behaviour on a surface that genuinely needs calm.
 //
 // Usage:
 //   <Shareable card={{ title: "...", big: "212M", ... }}>
@@ -20,7 +21,7 @@ export function Shareable({
   children,
   filename,
   inline = false,
-  reveal = true,
+  reveal = false,
 }: {
   card: SocialCardProps;
   children: React.ReactNode;

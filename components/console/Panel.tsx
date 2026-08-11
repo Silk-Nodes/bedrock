@@ -174,7 +174,7 @@ export async function Panel({
       <div className="share-host" style={{ position: "relative", height: "100%" }}>
         {inner}
         <span style={{ position: "absolute", top: 8, right: 8, zIndex: 2 }}>
-          <ShareButton reveal card={shareCard} filename={shareFilename} />
+          <ShareButton card={shareCard} filename={shareFilename} />
         </span>
       </div>
     );

@@ -47,7 +47,7 @@ export async function StatCard({
       />
       {shareCard && (
         <span style={{ position: "absolute", top: 8, right: 8, zIndex: 2 }}>
-          <ShareButton reveal card={shareCard} filename={shareFilename} />
+          <ShareButton card={shareCard} filename={shareFilename} />
         </span>
       )}
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 16, whiteSpace: "nowrap" }}>
