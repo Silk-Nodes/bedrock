@@ -1331,3 +1331,31 @@ export async function getStakerPopulation(): Promise<StakerPopulationPoint[]> {
     return [];
   }
 }
+
+// ── Stake by vintage (stake-weighted loyalty) ────────────────────────────────
+// ATOM staked today, grouped by the year each wallet FIRST delegated. Written
+// once a day by the holder crawl, which reads balances from the chain, so the
+// series accrues forward only: there is no way to know what a wallet held on a
+// past date. Empty until the first crawl after the feature shipped.
+//
+// vintage_year 0 means an address currently holds stake but has no captured
+// delegate event. Kept as its own bucket rather than folded into a real year.
+export type VintageRow = { day: string; year: number; wallets: number; atom: number };
+
+export async function getStakerVintage(): Promise<VintageRow[]> {
+  try {
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/stakers/vintage`, { next: { revalidate: 3600 } });
+    if (!res.ok) return [];
+    const j = (await res.json()) as {
+      vintage?: { day: string; vintage_year: number; wallets: number; staked_uatom: string }[];
+    };
+    return (j.vintage ?? []).map((v) => ({
+      day: v.day,
+      year: v.vintage_year,
+      wallets: v.wallets,
+      atom: Number(v.staked_uatom) / 1e6,
+    }));
+  } catch {
+    return [];
+  }
+}

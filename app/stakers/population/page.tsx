@@ -29,7 +29,7 @@
 import { MetricCard } from "@/components/console/MetricCard";
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { Soon } from "@/components/console/Soon";
-import { getHolders, getStakerPopulation, type HolderSnap } from "@/lib/indexer";
+import { getHolders, getStakerPopulation, getStakerVintage, type HolderSnap } from "@/lib/indexer";
 import { seo } from "@/lib/seo";
 
 export const revalidate = 600;
@@ -58,7 +58,7 @@ const RUNGS: { key: keyof HolderSnap["tiers"]; label: string; next?: keyof Holde
 ];
 
 export default async function StakersPopulation() {
-  const [h, months] = await Promise.all([getHolders(), getStakerPopulation()]);
+  const [h, months, vintage] = await Promise.all([getHolders(), getStakerPopulation(), getStakerVintage()]);
 
   if (!h.available || !h.latest) {
     return (
@@ -256,6 +256,49 @@ export default async function StakersPopulation() {
                 counts wallets that took any staking action that month, which is activity rather than headcount: a
                 wallet that delegates once and never claims again emits no events while staying bonded. A fall means
                 fewer wallets acted, not that stakers left.
+              </div>
+            </ConsoleModule>
+          </div>
+        );
+      })()}
+
+      {vintage.length > 0 && (() => {
+        // Latest day only. The series accrues forward and is one row per vintage
+        // year per day, so the newest day is the current picture.
+        const latestDay = vintage[vintage.length - 1].day;
+        const rows = vintage.filter((v) => v.day === latestDay).sort((a, b) => a.year - b.year);
+        const totalAtom = rows.reduce((n, r) => n + r.atom, 0);
+        const maxAtom = Math.max(...rows.map((r) => r.atom), 1);
+        return (
+          <div style={{ marginTop: 12 }}>
+            <ConsoleModule
+              title="Stake by joining year"
+              meta={`${latestDay} · who holds the stake today`}
+              headingLevel={2}
+              dot="var(--moss)"
+            >
+              <div style={{ display: "flex", flexDirection: "column", gap: 9, maxWidth: 900 }}>
+                {rows.map((r) => (
+                  <div key={r.year} style={{ display: "grid", gridTemplateColumns: "110px 1fr 150px 90px", alignItems: "center", gap: 14 }}>
+                    <span className="data" style={{ fontSize: 12, color: "var(--ink-70)" }}>
+                      {r.year === 0 ? "unknown" : `joined ${r.year}`}
+                    </span>
+                    <div style={{ height: 20, background: "var(--paper-2)", borderRadius: 2, position: "relative", overflow: "hidden" }}>
+                      <div style={{ position: "absolute", inset: "0 auto 0 0", width: `${Math.max(0.4, (r.atom / maxAtom) * 100)}%`, background: "var(--moss-text)", borderRadius: 2 }} />
+                    </div>
+                    <span className="data" style={{ fontSize: 12.5, color: "var(--ink)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                      {compact(r.atom)} ATOM
+                    </span>
+                    <span className="data" style={{ fontSize: 12, color: "var(--ink-50)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                      {totalAtom > 0 ? `${((r.atom / totalAtom) * 100).toFixed(1)}%` : "·"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 16, fontSize: 13, lineHeight: 1.65, color: "var(--ink-60)", maxWidth: 820 }}>
+                ATOM staked right now, grouped by the year each wallet first delegated. Balances are read from the
+                chain, not derived from events. &ldquo;unknown&rdquo; is stake held by addresses with no captured
+                delegate event, kept separate rather than folded into a year.
               </div>
             </ConsoleModule>
           </div>
