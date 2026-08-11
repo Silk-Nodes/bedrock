@@ -28,6 +28,7 @@
 
 import { MetricCard } from "@/components/console/MetricCard";
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
+import { ShareBars, ShareLineChart } from "@/components/share/ShareCharts";
 import { Soon } from "@/components/console/Soon";
 import { getHolders, getStakerPopulation, getStakerVintage, type HolderSnap } from "@/lib/indexer";
 import { seo } from "@/lib/seo";
@@ -171,7 +172,33 @@ export default async function StakersPopulation() {
 
       <div style={{ marginTop: 12 }}>
         <ConsoleModule title="Population, day by day" meta={`${first.day} → ${latest.day}`} headingLevel={2} dot="var(--hub)">
-          <IntelCard title="Wallets staking ATOM" meta={`${days} daily crawls`}>
+          <IntelCard
+            title="Wallets staking ATOM"
+            meta={`${days} daily crawls`}
+            shareFilename="bedrock-staker-population"
+            share={{
+              title: "Wallets staking ATOM",
+              subtitle: `Every bonded validator's delegator list, crawled daily · Cosmos HUB`,
+              big: fmt(latest.stakers_total),
+              unit: "wallets",
+              delta: `${latest.stakers_total - first.stakers_total >= 0 ? "+" : ""}${fmt(latest.stakers_total - first.stakers_total)} · ${days}d`,
+              deltaPositive: latest.stakers_total >= first.stakers_total,
+              context:
+                "Counted from the chain, not estimated. The series starts at the first crawl and grows a day at a time; there is no earlier record of what wallets held.",
+              body: (
+                <ShareLineChart
+                  height={220}
+                  series={[
+                    {
+                      label: "Wallets staking",
+                      color: "var(--moss)",
+                      points: hist.map((p) => ({ date: p.day, value: p.stakers_total })),
+                    },
+                  ]}
+                />
+              ),
+            }}
+          >
             <Sparkline points={hist.map((p) => p.stakers_total)} />
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 12 }} className="data">
               <span style={{ color: "var(--ink-50)" }}>{first.day} · {fmt(first.stakers_total)}</span>
@@ -195,7 +222,12 @@ export default async function StakersPopulation() {
         const years = [...byYear.entries()].sort((a, b) => a[0].localeCompare(b[0]));
         const yMax = Math.max(...years.map(([, v]) => v.added), 1);
         const everStaked = months[months.length - 1]?.cumulative ?? 0;
-        const recent = months.slice(-24);
+        // The current month is still filling, so including it puts a cliff on the
+        // end of the line that is an artefact of the calendar, not the data.
+        // Same trap the cohorts page hit with its last weekly bar.
+        const thisMonth = new Date().toISOString().slice(0, 7);
+        const complete = months.filter((m) => m.month.slice(0, 7) < thisMonth);
+        const recent = complete.slice(-24);
         return (
           <div style={{ marginTop: 12 }}>
             <ConsoleModule
@@ -223,9 +255,29 @@ export default async function StakersPopulation() {
                 </div>
               </div>
 
-              <div className="data" style={{ fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ink-50)", marginBottom: 10 }}>
-                First-time stakers, by year
-              </div>
+              <IntelCard
+                title="First-time stakers, by year"
+                meta={`${fmt(everStaked)} wallets ever`}
+                shareFilename="bedrock-first-time-stakers"
+                share={{
+                  title: "First-time ATOM stakers, by year",
+                  subtitle: "Wallets counted the year they first delegated · Cosmos HUB",
+                  big: fmt(everStaked),
+                  unit: "wallets have ever staked",
+                  context:
+                    "A wallet is counted once, in the year of its first delegation, so this never double counts. The current year is still in progress.",
+                  body: (
+                    <ShareBars
+                      unit=""
+                      rows={years.map(([y, v]) => ({
+                        label: y,
+                        value: v.added,
+                        display: fmt(v.added),
+                      }))}
+                    />
+                  ),
+                }}
+              >
               <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 880 }}>
                 {years.map(([y, v]) => (
                   <div key={y} style={{ display: "grid", gridTemplateColumns: "60px 1fr 110px", alignItems: "center", gap: 16 }}>
@@ -235,14 +287,18 @@ export default async function StakersPopulation() {
                     </div>
                     <span className="data" style={{ fontSize: 12.5, color: "var(--ink)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                       {fmt(v.added)}
+                      {y === thisMonth.slice(0, 4) && (
+                        <span style={{ color: "var(--ink-40)", fontWeight: 400 }}> so far</span>
+                      )}
                     </span>
                   </div>
                 ))}
-              </div>
+                </div>
+              </IntelCard>
 
               <div style={{ marginTop: 26 }}>
                 <div className="data" style={{ fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ink-50)", marginBottom: 8 }}>
-                  Wallets active per month, last 24 months
+                  Wallets active per month, complete months only
                 </div>
                 <Sparkline points={recent.map((m) => m.active)} />
                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12 }} className="data">
@@ -277,6 +333,29 @@ export default async function StakersPopulation() {
               headingLevel={2}
               dot="var(--moss)"
             >
+              <IntelCard
+                title="Stake by joining year"
+                meta={`${compact(totalAtom)} ATOM staked`}
+                shareFilename="bedrock-stake-by-vintage"
+                share={{
+                  title: "Who holds the staked ATOM",
+                  subtitle: "Stake today, by the year each wallet first delegated · Cosmos HUB",
+                  big: compact(totalAtom),
+                  unit: "ATOM staked",
+                  context:
+                    "Balances read from the chain, then grouped by first delegation. Not derived from events, which overstate stake by 58% against chain truth.",
+                  body: (
+                    <ShareBars
+                      rows={rows.map((r) => ({
+                        label: r.year === 0 ? "unknown" : `joined ${r.year}`,
+                        value: r.atom,
+                        display: `${compact(r.atom)} ATOM`,
+                        note: totalAtom > 0 ? `· ${((r.atom / totalAtom) * 100).toFixed(0)}%` : undefined,
+                      }))}
+                    />
+                  ),
+                }}
+              >
               <div style={{ display: "flex", flexDirection: "column", gap: 9, maxWidth: 900 }}>
                 {rows.map((r) => (
                   <div key={r.year} style={{ display: "grid", gridTemplateColumns: "110px 1fr 150px 90px", alignItems: "center", gap: 14 }}>
@@ -295,6 +374,7 @@ export default async function StakersPopulation() {
                   </div>
                 ))}
               </div>
+              </IntelCard>
               <div style={{ marginTop: 16, fontSize: 13, lineHeight: 1.65, color: "var(--ink-60)", maxWidth: 820 }}>
                 ATOM staked right now, grouped by the year each wallet first delegated. Balances are read from the
                 chain, not derived from events. &ldquo;unknown&rdquo; is stake held by addresses with no captured
