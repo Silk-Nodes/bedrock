@@ -7,6 +7,18 @@ import { getAddressActivity, getAddressSummary, getLabels, getShareBlock, getWal
 
 const HOSTS = ["https://cosmos-rest.publicnode.com", "https://rest.cosmos.directory/cosmoshub"];
 
+// A slow indexer must never take the chain reads down with it. Promise.all
+// waits for the slowest member, so when the summary query took 87s the whole
+// route 504'd and the panel reported "no on-chain position" for a wallet
+// holding 2.1M ATOM. Each indexer call now degrades to a fallback on its own
+// deadline; the chain reads answer regardless.
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([
+    p.catch(() => fallback),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
+}
+
 async function jget(path: string): Promise<Record<string, unknown> | null> {
   for (const host of HOSTS) {
     try {
@@ -31,15 +43,21 @@ export async function GET(_req: Request, ctx: { params: Promise<{ addr: string }
     jget(`/cosmos/staking/v1beta1/delegators/${addr}/unbonding_delegations`),
     jget(`/cosmos/distribution/v1beta1/delegators/${addr}/rewards`),
     getLiveAtomPrice(),
-    getAddressActivity(addr, 150),
+    withTimeout(getAddressActivity(addr, 150), 8000, { events: [], live: false }),
     getLabels(),
-    getAddressSummary(addr),
-    getWalletFlowClass(addr, 180),
+    // The summary needs every chunk by definition (first_seen, lifetime sums),
+    // so it is the one most likely to miss its deadline. Null here is fine: the
+    // panel already falls back to aggregating the activity window.
+    withTimeout(getAddressSummary(addr), 4000, null),
+    withTimeout(getWalletFlowClass(addr, 180), 5000, null),
     getShareBlock(),  // stamped on the panel's exported card
   ]);
 
+  // Both chain reads failed. jget returns null only on failure, never for an
+  // address that simply holds nothing, so this is unreachable-chain and must
+  // not be reported to the user as an empty wallet.
   if (!bal && !dels) {
-    return Response.json({ address: addr, live: false }, { status: 200 });
+    return Response.json({ address: addr, live: false, reason: "unreachable" }, { status: 200 });
   }
 
   const liquid =
@@ -241,7 +259,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ addr: string }
     tags,
     // Net-flow behavior classification (distributor / router / accumulator),
     // only surfaced when the wallet has meaningful exchange interaction.
-    flow_class: flowClass.live && flowClass.cls !== "neutral"
+    flow_class: flowClass?.live && flowClass.cls !== "neutral"
       ? { cls: flowClass.cls, label: flowClass.label, cex_out: flowClass.cex_out, cex_in: flowClass.cex_in, other_in: flowClass.other_in, net: flowClass.net, net_with_other: flowClass.net_with_other, window_days: flowClass.window_days }
       : null,
   });
