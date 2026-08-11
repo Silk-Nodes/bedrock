@@ -50,7 +50,11 @@ export async function MetricCard({
   const last = has ? series[series.length - 1] : 0;
   const pct = has && first !== 0 ? ((last - first) / Math.abs(first)) * 100 : 0;
   const up = pct >= 0;
-  const deltaColor = up ? "var(--moss)" : "var(--iron)";
+  // Text cuts, not the fill tokens. --moss is tuned for bars and reaches only
+  // 4.45:1 as small text on the light paper, just under the 4.5 floor; measured
+  // on /stakers/population. --moss-text/--iron-text carry the same meaning at
+  // 5.83:1 and 5.43:1. This card is used on most pages, so the fix is site-wide.
+  const deltaColor = up ? "var(--moss-text)" : "var(--iron-text)";
 
   // Sparkline geometry (area + line + glowing endpoint).
   let path = "", area = "", lastX = 0, lastY = 0;
