@@ -24,11 +24,15 @@ export async function PendingData({
 }) {
   const status = await getIndexerStatus();
   const pct = status.live ? Math.max(0, Math.min(100, status.pct)) : 0;
+  // Once the backfill has met tip_start the chain is fully indexed, and the
+  // blocks above it belong to the tip-follower. Saying "31.5M of 32.4M blocks"
+  // then reads as 900k missing when nothing is missing at all.
+  const done = status.backfill_complete;
 
   return (
     <div className="surface" style={{ padding: "26px 28px", maxWidth: 880 }}>
       <div className="data" style={{ fontSize: 10, letterSpacing: 1.4, textTransform: "uppercase", color: "var(--hub)" }}>
-        Indexing in progress
+        {done ? "History indexed" : "Indexing in progress"}
       </div>
       <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--ink)", marginTop: 8 }}>
         {title}
@@ -46,7 +50,9 @@ export async function PendingData({
             <div className="gbar-fill" style={{ width: `${pct}%`, ["--gbar-c"]: "var(--hub)" } as React.CSSProperties} />
           </div>
           <div className="data" style={{ fontSize: 10.5, color: "var(--ink-40)", marginTop: 7 }}>
-            {fmtM(status.last_height)} of {fmtM(status.tip_height)} blocks · the tip-follower stays live on new blocks
+            {done
+              ? `genesis to block ${fmtM(status.last_height)}, then the tip-follower live on every block since`
+              : `${fmtM(status.last_height)} of ${fmtM(status.tip_height)} blocks · the tip-follower stays live on new blocks`}
           </div>
         </div>
       )}
