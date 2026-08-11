@@ -1299,3 +1299,35 @@ export async function getValidatorCommissionFlow(days = 30): Promise<ValidatorCo
   }
   return { live: false, days, windowStart: null, rows: [] };
 }
+
+// ── Staker population, monthly ───────────────────────────────────────────────
+// Served from a precomputed rollup: the source scan is a ~3 minute pass over
+// 40M staking_events and must never run on a request.
+//
+// `newDelegators` is EXACT. A wallet's first-ever delegate event is a definite
+// fact and cannot be double counted.
+//
+// `active` is ACTIVITY, not headcount, and the distinction matters. A wallet
+// that delegates once and never claims or moves again emits no further events
+// while staying bonded and earning. So a fall in `active` means fewer wallets
+// DID something that month, never that stakers left. Any copy built on this
+// must say "active", never "remaining" or "lost".
+export type StakerPopulationPoint = { month: string; newDelegators: number; active: number; cumulative: number };
+
+export async function getStakerPopulation(): Promise<StakerPopulationPoint[]> {
+  try {
+    const res = await ixFetch(`${INDEXER_URL}/api/v1/stakers/population`, { next: { revalidate: 3600 } });
+    if (!res.ok) return [];
+    const j = (await res.json()) as {
+      months?: { month: string; new_delegators: number; active_delegators: number; cumulative_ever: number }[];
+    };
+    return (j.months ?? []).map((m) => ({
+      month: m.month,
+      newDelegators: m.new_delegators,
+      active: m.active_delegators,
+      cumulative: m.cumulative_ever,
+    }));
+  } catch {
+    return [];
+  }
+}
