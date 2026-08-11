@@ -14,6 +14,9 @@
 
 import { ConsolePage, ConsoleModule } from "@/components/console/Console";
 import { StatCard } from "@/components/console/StatCard";
+import { Shareable } from "@/components/share/Shareable";
+import { stampCard } from "@/components/share/stampCard";
+import { ShareBars } from "@/components/share/ShareCharts";
 import { RichListTable } from "@/components/richlist/RichListTable";
 import { ExchangeHoldersTable } from "@/components/richlist/ExchangeHoldersTable";
 import { getWhaleBoard, getExchangeHolders } from "@/lib/indexer";
@@ -133,7 +136,29 @@ export default async function RichListPage({ searchParams }: { searchParams: Pro
             </p>
 
             {ex.live && ex.venues.length > 0 ? (
-              <ExchangeHoldersTable venues={ex.venues} total={ex.total} />
+              <Shareable
+                filename="bedrock-exchange-custody"
+                card={await stampCard({
+                  title: "ATOM held by exchanges",
+                  subtitle: `${ex.venues.length} venues · ${ex.wallets} identified wallets · Cosmos HUB`,
+                  big: compact(ex.total),
+                  unit: "ATOM custodied",
+                  context:
+                    "Customer deposits the exchange controls keys to, not the exchange's own treasury. Wallets are identified by chain-of-custody, so this is a floor.",
+                  body: (
+                    <ShareBars
+                      rows={ex.venues.slice(0, 8).map((v) => ({
+                        label: v.venue,
+                        value: v.held,
+                        display: `${compact(v.held)} ATOM`,
+                        note: ex.total > 0 ? `· ${Math.round((v.held / ex.total) * 100)}%` : undefined,
+                      }))}
+                    />
+                  ),
+                })}
+              >
+                <ExchangeHoldersTable venues={ex.venues} total={ex.total} />
+              </Shareable>
             ) : (
               <div style={{ padding: 20, fontSize: 13, color: "var(--ink-60)" }}>
                 Exchange holder data is unavailable right now.
@@ -168,7 +193,31 @@ export default async function RichListPage({ searchParams }: { searchParams: Pro
           <p style={{ margin: "8px 0 0", fontSize: 12.5, color: "var(--ink-60)", lineHeight: 1.55, maxWidth: 760 }}>{FILTERING}</p>
         </details>
 
-        <RichListTable rows={rows} />
+        <Shareable
+          filename="bedrock-rich-list"
+          card={await stampCard({
+            title: "The top 100 ATOM holders",
+            subtitle: "On-chain holders, exchange-linked wallets excluded · Cosmos HUB",
+            big: compact(held),
+            unit: "ATOM held",
+            delta: `${netStake >= 0 ? "+" : "−"}${compact(Math.abs(netStake))} net staked`,
+            deltaPositive: netStake >= 0,
+            context:
+              "Exchange and conduit wallets are removed, so these are positions rather than custody. Exchange stance counts direct transfers only and is a floor.",
+            body: (
+              <ShareBars
+                rows={[
+                  { label: "Held", value: held, display: `${compact(held)} ATOM` },
+                  { label: "Staked", value: staked, display: `${compact(staked)} ATOM`, note: `· ${stakePct}%` },
+                  { label: "Net staking", value: Math.abs(netStake), display: `${netStake >= 0 ? "+" : "−"}${compact(Math.abs(netStake))} ATOM`, color: netStake >= 0 ? "var(--moss)" : "var(--iron)" },
+                  { label: "Net exchange", value: Math.abs(netCex), display: `${netCex >= 0 ? "+" : "−"}${compact(Math.abs(netCex))} ATOM`, color: netCex >= 0 ? "var(--moss)" : "var(--iron)" },
+                ]}
+              />
+            ),
+          })}
+        >
+          <RichListTable rows={rows} />
+        </Shareable>
 
         <p style={{ marginTop: 14, fontSize: 12.5, color: "var(--ink-50)" }}>
           This is the live activity board: what the top holders are doing now.{" "}
