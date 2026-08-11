@@ -126,34 +126,42 @@ export const COHORT_PRIORITY = [
 //   then bump `as_of` to today.
 //
 // Two cursors, so "blocks indexed" was always ambiguous and is deliberately gone:
-//   1. the tip follower sits ~3 blocks behind the head (recent data is continuous)
-//   2. the history cursor walks forward from genesis and is still crossing the
-//      2022-2025 middle. Anything spanning that gap is incomplete and says so.
+//   1. the tip follower sits ~3 blocks behind the head
+//   2. the history cursor walked forward from genesis and has now MET the
+//      follower at tip_start. Every block that exists is indexed.
+//
+// The backfill's target is backfill_target (= tip_start), NOT chain_tip. Measured
+// against the moving chain tip it reads ~97% forever, because the denominator
+// keeps growing after the numerator has finished. That is what historyPct got
+// wrong and why the site showed 97.1% on a fully indexed chain.
 export const COVERAGE = {
-  as_of: "2026-07-16",
+  as_of: "2026-08-11",
 
   genesis_height: 5_200_791,      // cosmoshub-4 genesis
-  chain_tip: 32_068_512,          // chain head at as_of
-  history_cursor: 15_496_135,     // backfill has reached this height, walking forward
+  chain_tip: 32_447_473,          // chain head at as_of
+  history_cursor: 31_483_648,     // backfill cursor: has met backfill_target
+  backfill_target: 31_483_648,    // tip_start, where the follower took over
   tip_lag_blocks: 3,              // the live cursor's distance from the head
 
-  // continuous, gap-free window served by the tip follower
-  continuous_from: "2026-06-08",
+  // Continuous from the earliest indexed block. The Dec 2019 - Aug 2020 hole is
+  // the cosmoshub-2 to 3 halt (see CHAIN_GAPS): no blocks exist there, so it is
+  // not missing data and never will be.
+  continuous_from: "2019-06-01",
 
-  catching_up: true,
+  catching_up: false,
 
-  // flow attribution over the last 30d (share of volume we can name)
-  pct_volume_labeled_30d: 24.0,
-  pct_volume_unknown_both_sides_30d: 31.0,
-  pct_volume_unknown_one_side_30d: 45.0,
+  // Flow attribution over the last 30d, by share of transfer VOLUME:
+  // both counterparties labelled / exactly one / neither. Recomputed 2026-08-11.
+  pct_volume_labeled_30d: 15.7,
+  pct_volume_unknown_one_side_30d: 42.7,
+  pct_volume_unknown_both_sides_30d: 41.7,
 
-  // curated label registry, served live at /labels. 2026-07-16: +16 CEX labels
-  // contributed by Cosmos Labs (1 high, 15 inferred), chain-of-custody verified
-  // before import. The /labels page reads the live count; these are the stamp.
-  labels_active: 104,
+  // curated label registry, served live at /labels. The /labels page reads the
+  // live count; these are the stamp.
+  labels_active: 126,
   labels_certain: 15,
-  labels_high: 29,
-  labels_inferred: 60,
+  labels_high: 33,
+  labels_inferred: 78,
 };
 
 // Windows in which the Cosmos Hub produced NO BLOCKS.
@@ -179,10 +187,16 @@ export const CHAIN_GAPS: { from: string; to: string; label: string }[] = [
 ];
 
 
-// share of chain history the backfill has covered, genesis -> tip
+// Share of chain history the backfill has covered, genesis -> backfill_target.
+// The denominator is the target the backfill was given, not the live chain tip:
+// blocks above tip_start belong to the follower and are already indexed, so
+// dividing by chain_tip understates coverage and can never reach 100%.
 export const historyPct = () =>
-  ((COVERAGE.history_cursor - COVERAGE.genesis_height) /
-    (COVERAGE.chain_tip - COVERAGE.genesis_height)) * 100;
+  Math.min(
+    100,
+    ((COVERAGE.history_cursor - COVERAGE.genesis_height) /
+      (COVERAGE.backfill_target - COVERAGE.genesis_height)) * 100,
+  );
 
 export const CHANGELOG = [
   {

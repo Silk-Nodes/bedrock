@@ -202,22 +202,33 @@ export type IndexerStatus = {
   tip_lag: number;
   tip_live: boolean;
   live: boolean;
+  backfill_complete: boolean;
 };
 export async function getIndexerStatus(): Promise<IndexerStatus> {
-  const empty: IndexerStatus = { last_height: 0, tip_height: 0, pct: 0, events_session: 0, tip_lag: 0, tip_live: false, live: false };
+  const empty: IndexerStatus = { last_height: 0, tip_height: 0, pct: 0, events_session: 0, tip_lag: 0, tip_live: false, live: false, backfill_complete: false };
   try {
     const res = await ixFetch(`${INDEXER_URL}/api/v1/status`, { next: { revalidate: 60 } });
     if (!res.ok) return empty;
     const j = (await res.json()) as {
       last_indexed_height?: number; chain_tip_height?: number; events_processed_session?: number;
+      backfill_target?: number; backfill_complete?: boolean;
       tip_follower?: { lag_blocks?: number; last_indexed_height?: number };
     };
     const last = j.last_indexed_height ?? 0;
     const tip = j.chain_tip_height ?? 0;
+    // The backfill runs from genesis to tip_start, and the tip-follower covers
+    // everything above it. Measuring the backfill against the live chain tip
+    // therefore never reaches 100%: it sat at 97.1% while the chain was in fact
+    // fully indexed, because the denominator kept moving after the numerator
+    // had finished. Measure against the target it was actually given.
+    const target = j.backfill_target ?? 0;
+    const complete = j.backfill_complete ?? (target > 0 && last >= target);
+    const denom = target > 0 ? target : tip;
     return {
       last_height: last,
       tip_height: tip,
-      pct: tip > 0 ? (last / tip) * 100 : 0,
+      pct: complete ? 100 : denom > 0 ? Math.min(100, (last / denom) * 100) : 0,
+      backfill_complete: complete,
       events_session: j.events_processed_session ?? 0,
       tip_lag: j.tip_follower?.lag_blocks ?? 0,
       tip_live: (j.tip_follower?.last_indexed_height ?? 0) > 0,
