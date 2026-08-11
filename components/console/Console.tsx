@@ -277,7 +277,10 @@ export async function IntelCard({
               {meta}
             </span>
           )}
-          {shareCard && <ShareButton reveal card={shareCard} filename={shareFilename} />}
+          {/* Persistent, not reveal-on-hover. At 0.5 resting opacity the camera was
+              there but nobody found it, including on pages that had carried one for
+              weeks. Discoverability beats surface calm for an export affordance. */}
+          {shareCard && <ShareButton card={shareCard} filename={shareFilename} />}
         </span>
       </div>
       {/* Children container grows to the card's remaining height so a child

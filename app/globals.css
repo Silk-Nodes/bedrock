@@ -844,12 +844,12 @@ body { transition: background-color 180ms ease, color 180ms ease; }
 .pressable:active { transform: scale(0.97); }
 /* reveal variant: quietly visible, brightens to full on hover/focus.
    (Fully hidden tested poorly: nobody could find the camera.) */
-.share-cam-reveal { opacity: 0.5; }
+.share-cam-reveal { opacity: 0.75; }
 .share-host:hover .share-cam-reveal,
 .share-host:focus-within .share-cam-reveal,
 .share-cam-reveal:focus-visible { opacity: 1; }
 @media (hover: none) {
-  .share-cam-reveal { opacity: 0.65; } /* touch devices: keep it reachable */
+  .share-cam-reveal { opacity: 0.85; } /* touch devices: keep it reachable */
 }
 
 /* Milestone chart layout */

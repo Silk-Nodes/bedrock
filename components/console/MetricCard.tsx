@@ -74,7 +74,7 @@ export async function MetricCard({
     <div className={`surface${share ? " share-host" : ""}`} style={{ minHeight: has ? height : 118, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12, position: "relative" }}>
       {shareCard && (
         <span style={{ position: "absolute", top: 8, right: 8, zIndex: 2 }}>
-          <ShareButton reveal card={shareCard} filename={shareFilename} />
+          <ShareButton card={shareCard} filename={shareFilename} />
         </span>
       )}
       <div>

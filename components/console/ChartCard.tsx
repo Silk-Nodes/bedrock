@@ -43,7 +43,7 @@ export async function ChartCard({
           {meta && (
             <span className="data" style={{ fontSize: 9.5, letterSpacing: 1.2, textTransform: "uppercase", color: "var(--ink-40)" }}>{meta}</span>
           )}
-          {shareCard && <ShareButton reveal card={shareCard} filename={shareFilename} />}
+          {shareCard && <ShareButton card={shareCard} filename={shareFilename} />}
         </span>
       </div>
       <div>{children}</div>
