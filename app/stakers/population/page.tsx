@@ -29,7 +29,7 @@
 import { MetricCard } from "@/components/console/MetricCard";
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { Soon } from "@/components/console/Soon";
-import { getHolders, type HolderSnap } from "@/lib/indexer";
+import { getHolders, getStakerPopulation, type HolderSnap } from "@/lib/indexer";
 import { seo } from "@/lib/seo";
 
 export const revalidate = 600;
@@ -58,7 +58,7 @@ const RUNGS: { key: keyof HolderSnap["tiers"]; label: string; next?: keyof Holde
 ];
 
 export default async function StakersPopulation() {
-  const h = await getHolders();
+  const [h, months] = await Promise.all([getHolders(), getStakerPopulation()]);
 
   if (!h.available || !h.latest) {
     return (
@@ -184,6 +184,83 @@ export default async function StakersPopulation() {
           </div>
         </ConsoleModule>
       </div>
+
+      {months.length > 0 && (() => {
+        const byYear = new Map<string, { added: number; cum: number }>();
+        for (const m of months) {
+          const y = m.month.slice(0, 4);
+          const e = byYear.get(y) ?? { added: 0, cum: 0 };
+          byYear.set(y, { added: e.added + m.newDelegators, cum: Math.max(e.cum, m.cumulative) });
+        }
+        const years = [...byYear.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+        const yMax = Math.max(...years.map(([, v]) => v.added), 1);
+        const everStaked = months[months.length - 1]?.cumulative ?? 0;
+        const recent = months.slice(-24);
+        return (
+          <div style={{ marginTop: 12 }}>
+            <ConsoleModule
+              title="Since 2019"
+              meta={`${months[0].month.slice(0, 7)} → ${months[months.length - 1].month.slice(0, 7)}`}
+              headingLevel={2}
+              dot="var(--hub-2)"
+            >
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 40, marginBottom: 26 }}>
+                <div>
+                  <div className="data" style={{ fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ink-50)", marginBottom: 6 }}>
+                    Wallets that have ever staked
+                  </div>
+                  <div style={{ fontFamily: "var(--font-display)", fontSize: 34, color: "var(--ink)", letterSpacing: "-0.02em" }}>
+                    {fmt(everStaked)}
+                  </div>
+                </div>
+                <div>
+                  <div className="data" style={{ fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ink-50)", marginBottom: 6 }}>
+                    New in the last full month
+                  </div>
+                  <div style={{ fontFamily: "var(--font-display)", fontSize: 34, color: "var(--ink)", letterSpacing: "-0.02em" }}>
+                    {fmt(months[months.length - 2]?.newDelegators ?? 0)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="data" style={{ fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ink-50)", marginBottom: 10 }}>
+                First-time stakers, by year
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxWidth: 880 }}>
+                {years.map(([y, v]) => (
+                  <div key={y} style={{ display: "grid", gridTemplateColumns: "60px 1fr 110px", alignItems: "center", gap: 16 }}>
+                    <span className="data" style={{ fontSize: 12, color: "var(--ink-70)" }}>{y}</span>
+                    <div style={{ height: 20, background: "var(--paper-2)", borderRadius: 2, position: "relative", overflow: "hidden" }}>
+                      <div style={{ position: "absolute", inset: "0 auto 0 0", width: `${Math.max(0.4, (v.added / yMax) * 100)}%`, background: "var(--hub-2)", borderRadius: 2 }} />
+                    </div>
+                    <span className="data" style={{ fontSize: 12.5, color: "var(--ink)", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                      {fmt(v.added)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: 26 }}>
+                <div className="data" style={{ fontSize: 10.5, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ink-50)", marginBottom: 8 }}>
+                  Wallets active per month, last 24 months
+                </div>
+                <Sparkline points={recent.map((m) => m.active)} />
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, fontSize: 12 }} className="data">
+                  <span style={{ color: "var(--ink-50)" }}>{recent[0].month.slice(0, 7)} · {fmt(recent[0].active)}</span>
+                  <span style={{ color: "var(--ink)" }}>{recent[recent.length - 1].month.slice(0, 7)} · {fmt(recent[recent.length - 1].active)}</span>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 18, fontSize: 13, lineHeight: 1.65, color: "var(--ink-60)", maxWidth: 800 }}>
+                First-time stakers counts a wallet the month it first delegated, so it never double counts. Active
+                counts wallets that took any staking action that month, which is activity rather than headcount: a
+                wallet that delegates once and never claims again emits no events while staying bonded. A fall means
+                fewer wallets acted, not that stakers left.
+              </div>
+            </ConsoleModule>
+          </div>
+        );
+      })()}
 
       <div style={{ marginTop: 12 }}>
         <ConsoleModule title="Not here yet" headingLevel={2} dot="var(--ink-40)">
