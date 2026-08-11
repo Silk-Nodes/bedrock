@@ -99,7 +99,12 @@ export default async function MethodologyPage() {
               {[
                 { label: "Hub history indexed", value: `${idx.pct.toFixed(1)}%` },
                 { label: "Blocks indexed", value: fmtM(idx.last_height) },
-                { label: "Remaining", value: fmtM(Math.max(0, idx.tip_height - idx.last_height)) },
+                // Not "Remaining": the gap between the backfill cursor and the
+                // chain tip belongs to the tip-follower and is already indexed.
+                // Printing it as a backlog contradicted the 100% beside it.
+                idx.backfill_complete
+                  ? { label: "Live head", value: fmtM(idx.tip_height) }
+                  : { label: "Remaining", value: fmtM(Math.max(0, idx.tip_height - idx.last_height)) },
                 { label: "Tip-follower", value: idx.tip_lag <= 5 ? "live · capturing" : `${fmtM(idx.tip_lag)} behind` },
               ].map((c) => (
                 <div key={c.label} style={{ background: "var(--paper)", padding: "14px 16px" }}>
@@ -343,8 +348,9 @@ export default async function MethodologyPage() {
             {pct(historyPct())}
           </div>
           <div className="data" style={{ color: "var(--ink-60)" }}>
-            genesis → block {(COVERAGE.history_cursor / 1_000_000).toFixed(2)}M of{" "}
-            {(COVERAGE.chain_tip / 1_000_000).toFixed(2)}M · still walking
+            {COVERAGE.catching_up
+              ? `genesis → block ${(COVERAGE.history_cursor / 1_000_000).toFixed(2)}M of ${(COVERAGE.chain_tip / 1_000_000).toFixed(2)}M · still walking`
+              : `genesis → block ${(COVERAGE.backfill_target / 1_000_000).toFixed(2)}M, where the tip-follower took over`}
           </div>
         </div>
         <div style={{ background: "var(--paper-2)", padding: 24 }}>
