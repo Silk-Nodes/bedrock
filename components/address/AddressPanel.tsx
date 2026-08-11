@@ -242,7 +242,11 @@ export function AddressPanel() {
 
               {!loading && data && !data.live && (
                 <div style={{ fontSize: 13, color: "var(--ink-60)", lineHeight: 1.5 }}>
-                  This address has no on-chain position, or the chain is unreachable right now.
+                  {/* Never conflate the two. A failed chain read reported as an
+                      empty wallet is the most damaging way this can fail: it
+                      showed "no position" on a wallet holding 2.1M ATOM. */}
+                  Could not read the chain for this address just now. That does not mean the address is
+                  empty. Try again in a moment.
                 </div>
               )}
 
