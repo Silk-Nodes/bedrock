@@ -6,6 +6,7 @@
 // lookup is shareable. No Mintscan needed.
 
 import { useState, useEffect, useCallback } from "react";
+import { useHydrated, utcClock } from "@/lib/hydrated";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AddressLink } from "@/components/address/AddressLink";
 
@@ -63,6 +64,8 @@ function Tile({ label, value, color }: { label: string; value: string; color?: s
 }
 
 export function ExploreClient() {
+  // Relative times only after hydration; see useHydrated.
+  const hydrated = useHydrated();
   const sp = useSearchParams();
   const router = useRouter();
   const initial = sp.get("addr") ?? "";
@@ -183,7 +186,7 @@ export function ExploreClient() {
                           : shortCp(e.counterparty)}{e.is_ibc ? " · IBC" : ""}
                       </span>
                       <span className="data" style={{ fontSize: 12, color: "var(--ink-80)", textAlign: "right" }}>{atomU(e.amount_uatom)}</span>
-                      <span className="data" style={{ fontSize: 10, color: "var(--ink-40)", textAlign: "right", minWidth: 34 }}>{ago(e.time)}</span>
+                      <span className="data" style={{ fontSize: 10, color: "var(--ink-40)", textAlign: "right", minWidth: 34 }}>{hydrated ? ago(e.time) : utcClock(e.time)}</span>
                     </div>
                   ))}
                 </div>

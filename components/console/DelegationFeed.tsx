@@ -8,6 +8,7 @@
 // more refetch.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useHydrated, utcClock } from "@/lib/hydrated";
 import { ValidatorAvatar } from "./ValidatorAvatar";
 import { useAddressPanel } from "@/components/address/AddressPanelProvider";
 import { ValidatorLink } from "@/components/validator/ValidatorLink";
@@ -50,6 +51,16 @@ function fmtCompact(n: number): string {
   if (Math.abs(n) >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return n.toFixed(n < 100 ? 1 : 0);
 }
+// NEVER call this during the first render pass. It reads Date.now(), so the
+// server bakes one value into the HTML and the client computes another when it
+// hydrates. This page is prerendered and served with max-age=14400, so the HTML
+// a browser gets is routinely hours old: the mismatch was not a race, it was
+// guaranteed. React then threw #418, abandoned hydration for this subtree, and
+// every control inside it went inert. The feed still LOOKED right, which is why
+// it read as "the feed is broken" rather than as an error.
+//
+// utcClock is the hydration-safe stand-in: it derives from the event's own
+// timestamp only, so server and client always agree. See useHydrated.
 function fmtAgo(iso: string): string {
   const sec = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
   if (sec < 60) return `${Math.round(sec)}s`;
@@ -130,6 +141,8 @@ export function DelegationFeed({
   const [total, setTotal] = useState<number>(initialTotal);
   const [limit, setLimit] = useState<number>(PAGE);
   const [loading, setLoading] = useState(false);
+  // Relative times only after the first client render; see useHydrated.
+  const mounted = useHydrated();
   // Skip the fetch on first mount: the initial page is already server-rendered
   // for the default (all / all-sizes) filter.
   const primed = useRef(false);
@@ -230,7 +243,7 @@ export function DelegationFeed({
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", borderBottom: "1px dotted var(--ink-20)" }}>{e.valName}</span>
                     </ValidatorLink>
                   )}
-                  <span className="data feed-ago" style={{ flexShrink: 0, fontSize: 10.5, color: "var(--ink-40)" }}>{fmtAgo(e.time)}<span className="feed-ago-suffix"> ago</span></span>
+                  <span className="data feed-ago" style={{ flexShrink: 0, fontSize: 10.5, color: "var(--ink-40)" }}>{mounted ? fmtAgo(e.time) : utcClock(e.time)}{mounted ? <span className="feed-ago-suffix"> ago</span> : null}</span>
                 </div>
               );
             })}
