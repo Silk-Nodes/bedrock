@@ -5,6 +5,7 @@
 // board just reflects it. Optimistic voting with rollback on error.
 
 import { useCallback, useEffect, useState } from "react";
+import { useHydrated, utcDate } from "@/lib/hydrated";
 
 type Item = {
   id: number; title: string; description: string;
@@ -39,6 +40,8 @@ function ago(ts: string): string {
 }
 
 export function FeedbackBoard() {
+  // Relative times only after hydration; see useHydrated.
+  const hydrated = useHydrated();
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState("");
@@ -196,7 +199,7 @@ export function FeedbackBoard() {
                         {open ? "Show less" : "Show more"}
                       </button>
                     )}
-                    <span className="data" style={{ fontSize: 11, color: "var(--ink-40)" }}>{ago(it.created_at)}</span>
+                    <span className="data" style={{ fontSize: 11, color: "var(--ink-40)" }}>{hydrated ? ago(it.created_at) : utcDate(it.created_at)}</span>
                   </div>
                 </div>
               </div>

@@ -698,7 +698,12 @@ export async function getFlowFeed(
     if (direction) p.set("dir", direction);
     if (hours > 0) p.set("hours", String(hours));
     const url = `${INDEXER_URL}/api/v1/flows/feed?${p.toString()}`;
-    const res = await fetch(url, { next: { revalidate: 15 } });
+    // ixFetch, never bare fetch: every indexer endpoint requires an API key, and
+    // this was the last call in this file still using fetch directly. It had been
+    // answering 401 since keys went live, and the !res.ok branch below turns that
+    // into an empty feed, so the live feed rendered as "no flows" with nothing in
+    // the logs to say why.
+    const res = await ixFetch(url, { next: { revalidate: 15 } });
     if (!res.ok) return { flows: [], live: false };
     const j = (await res.json()) as {
       flows?: (Omit<LabeledFlow, "amount_atom"> & { amount_uatom: string })[];
