@@ -1,0 +1,47 @@
+# Dependency audit gate.
+#
+# The point is to catch a known-vulnerable package in dev, on the PR, rather
+# than after it is already serving production. Dependabot tells you what is
+# broken AFTER it is on the default branch; this refuses the merge instead.
+#
+# It deliberately does NOT run `audit --fix`. An automatic transitive bump can
+# break the build, so the fix belongs in a reviewed commit where the build and
+# the app can be checked. This job reports and blocks; a human decides how.
+name: Dependency audit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # A lockfile that is clean today can be vulnerable tomorrow without anything
+  # in the repo changing, because the advisory is published later. The weekly
+  # run is what catches that; the PR run alone would not.
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      # Node 22 to match the deploy host, not the newer local version, so the
+      # tree resolved here is the tree that actually ships.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # moderate and above. The postcss advisory that reached this repo's own
+      # lockfile (GHSA-fxqj-rqcc-2cmp) was rated moderate, so a high-only gate
+      # would have let it straight through.
+      - name: Audit
+        run: pnpm audit --audit-level=moderate
