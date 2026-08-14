@@ -6,8 +6,8 @@
 import { ConsolePage, ConsoleModule, IntelCard } from "@/components/console/Console";
 import { Soon } from "@/components/console/Soon";
 import { RelPerfChart } from "@/components/atom/RelPerfChart";
-import { RelPerfShareChart } from "@/components/atom/RelPerfShareChart";
 import { getPerfHistory, getRelPerfTable } from "@/lib/relperf";
+import { getShareBlock } from "@/lib/indexer";
 import { ShareBars } from "@/components/share/ShareCharts";
 import { seo } from "@/lib/seo";
 
@@ -32,12 +32,13 @@ export default async function AtomRelative() {
     );
   }
 
-  // RelPerfShareChart slices the last REL_DAYS *points*, not days, so a sparse
-  // series makes "over 1 year" wrong the same way the Binance card's
-  // takeLast={365} was. Name the dates the plotted points actually span.
-  const REL_DAYS = 365;
-  const relPts = hist.series[0]?.points.slice(-REL_DAYS) ?? [];
-  const relWindow = relPts.length > 1 ? `${relPts[0].date} → ${relPts[relPts.length - 1].date}` : "the live window";
+  // The relative-performance snapshot is built INSIDE RelPerfChart, not here.
+  // IntelCard is an async server component, so a share body passed as a prop is
+  // frozen at render time and cannot see the chart's range state: picking 30D
+  // still produced a one-year card, because REL_DAYS was hardcoded to 365 here
+  // while the chart itself defaults to 90D. The button now lives next to the
+  // range control that determines it, which is also where it belongs.
+  const shareBlock = await getShareBlock();
 
   return (
     <ConsolePage>
@@ -45,8 +46,8 @@ export default async function AtomRelative() {
         <div className="console-grid">
           {hist.live && (
             <div className="span-12">
-              <IntelCard title="ATOM vs the majors" meta="rebased to 0% at window start" shareFilename="bedrock-atom-relative" share={{ title: "ATOM vs the majors · Cosmos HUB", subtitle: `Relative performance · ${relWindow}, rebased to 0% at the start`, body: <RelPerfShareChart series={hist.series} days={REL_DAYS} /> }}>
-                <RelPerfChart series={hist.series} />
+              <IntelCard title="ATOM vs the majors" meta="rebased to 0% at window start">
+                <RelPerfChart series={hist.series} shareBlock={shareBlock} />
               </IntelCard>
             </div>
           )}
