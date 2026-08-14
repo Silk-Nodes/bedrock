@@ -6,6 +6,8 @@
 
 import { useMemo, useState } from "react";
 import { LineChart, type Series } from "@/components/charts/LineChart";
+import { RelPerfShareChart } from "@/components/atom/RelPerfShareChart";
+import { ShareButton } from "@/components/share/ShareButton";
 import type { PerfSeries } from "@/lib/relperf";
 
 const RANGES = [
@@ -15,9 +17,19 @@ const RANGES = [
   { id: "1Y", days: 365 },
 ];
 
-export function RelPerfChart({ series }: { series: PerfSeries[] }) {
+export function RelPerfChart({ series, shareBlock }: { series: PerfSeries[]; shareBlock?: number }) {
   const [range, setRange] = useState("90D");
   const days = RANGES.find((r) => r.id === range)!.days;
+
+  // The share card is built HERE, from the range currently on screen. It used
+  // to be passed into IntelCard from the server page with days hardcoded to
+  // 365, so selecting 30D still produced a one-year snapshot. Label the window
+  // from the points actually plotted, not from `days`: the series can be
+  // sparse, so the last N points may span more calendar time than N days.
+  const shownPts = series[0]?.points.slice(-days) ?? [];
+  const shownWindow = shownPts.length > 1
+    ? `${shownPts[0].date} → ${shownPts[shownPts.length - 1].date}`
+    : "the live window";
 
   const rebased: Series[] = useMemo(() => series.map((s) => {
     const pts = s.points.slice(-days);
@@ -45,7 +57,16 @@ export function RelPerfChart({ series }: { series: PerfSeries[] }) {
             </span>
           ))}
         </div>
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          <ShareButton
+            filename="bedrock-atom-relative"
+            card={{
+              title: "ATOM vs the majors · Cosmos HUB",
+              subtitle: `Relative performance · ${shownWindow}, rebased to 0% at the start`,
+              body: <RelPerfShareChart series={series} days={days} />,
+              blockHeight: shareBlock,
+            }}
+          />
           {RANGES.map((r) => (
             <button key={r.id} onClick={() => setRange(r.id)} className="data" style={{
               padding: "3px 10px", fontSize: 10.5, letterSpacing: 1, cursor: "pointer",
