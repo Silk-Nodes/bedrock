@@ -24,11 +24,21 @@ function fmtCompact(n: number): string {
   return Math.round(n).toString();
 }
 
-// USD income: whole dollars below 1k, one decimal through 10k ($1.6k), then compact.
-function fmtUsd(n: number): string {
-  if (n < 1_000) return Math.round(n).toString();
-  if (n < 10_000) return `${(n / 1_000).toFixed(1)}k`;
-  return fmtCompact(n);
+// Both halves of the income cell go through THIS, never through fmtCompact and
+// fmtUsd separately. They used to disagree: fmtCompact dropped to zero decimals
+// above 1k while the USD side kept one, so Binance Node (5,944 ATOM/mo) and
+// Allnodes (5,787) both printed "6k ATOM/mo" and then split into "$12k" and
+// "$11k". Both roundings were correct on their own and the pair read as a bug,
+// because two identical ATOM figures promise identical dollars.
+//
+// Three significant figures throughout keeps the large stakes clean (178k, not
+// 178.0k) and still separates neighbours down in the tail.
+function fmtIncome(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 100_000) return `${Math.round(n / 1_000)}k`;
+  if (n >= 10_000) return `${(n / 1_000).toFixed(1)}k`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(2)}k`;
+  return Math.round(n).toString();
 }
 
 export default async function ValidatorsSet() {
@@ -141,9 +151,9 @@ export default async function ValidatorsSet() {
                           <td className="num" style={{ color: "var(--ink-80)" }}>{(v.commission * 100).toFixed(0)}%</td>
                           {aprLive && (
                             <td className="num" style={{ color: "var(--ink)" }}>
-                              {fmtCompact(incomeAtomMo(v))}
+                              {fmtIncome(incomeAtomMo(v))}
                               <span style={{ color: "var(--ink-40)", fontSize: 11 }}>
-                                {" "}ATOM/mo{price.live ? ` · ~$${fmtUsd(incomeAtomMo(v) * price.usd)}` : ""}
+                                {" "}ATOM/mo{price.live ? ` · ~$${fmtIncome(incomeAtomMo(v) * price.usd)}` : ""}
                               </span>
                             </td>
                           )}
