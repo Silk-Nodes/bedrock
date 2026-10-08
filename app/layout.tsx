@@ -14,6 +14,7 @@ import { AddressPanel } from "@/components/address/AddressPanel";
 import { ValidatorPanelProvider } from "@/components/validator/ValidatorPanelProvider";
 import { ValidatorPanel } from "@/components/validator/ValidatorPanel";
 import "./globals.css";
+import { Umami } from "@/components/Umami";
 
 // Editorial Observatory type set.
 // Newsreader: a clean, modern, high-contrast serif (Teodor-like) for hero
@@ -164,6 +165,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             gtag('config', 'G-071V3SH8Y0');
           `}
         </Script>
+        <Umami />
       </body>
     </html>
   );
