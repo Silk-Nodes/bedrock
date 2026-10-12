@@ -182,6 +182,20 @@ export default async function Exchanges({ searchParams }: { searchParams: Promis
         </div>
       </div>
     </ConsoleModule>
+  ) : !netflow.live ? (
+    // The indexer did not answer for this window and nothing was cached for it
+    // (seen on the 7D tab during the Oct 11 to 12 outage). Keep the module and
+    // say why it is empty instead of dropping it.
+    <ConsoleModule lead dot="var(--iron)" title="Exchanges · net flow" meta={`deposits minus withdrawals · last ${winLabel}`}>
+      <div className="console-grid">
+        <div className="span-12">
+          <div style={{ padding: "22px 4px", fontSize: 13.5, color: "var(--ink-60)", lineHeight: 1.6 }}>
+            <strong style={{ color: "var(--iron-text)" }}>Live data delayed.</strong>{" "}
+            Bedrock&apos;s indexer did not answer for this window. The {winLabel} net flow appears here as soon as it does.
+          </div>
+        </div>
+      </div>
+    </ConsoleModule>
   ) : null;
 
   if (!hasFlows && !custody.live) {
