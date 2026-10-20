@@ -11,14 +11,25 @@ import type { IndexerStatus } from "@/lib/indexerStatus";
 
 const POLL_MS = 60_000;
 
-function hhmm(iso: string): string {
-  return new Date(iso).toISOString().slice(11, 16);
+// Always print the date: a bare "12:51 UTC" read as today when the indexer
+// had been down since 12:51 four days earlier.
+function stamp(iso: string): string {
+  const d = new Date(iso);
+  const month = d.toLocaleString("en-US", { month: "short", timeZone: "UTC" });
+  return `${month} ${d.getUTCDate()}, ${d.toISOString().slice(11, 16)} UTC`;
+}
+
+function duration(min: number): string {
+  if (min < 60) return `about ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 48) return `about ${h} ${h === 1 ? "hour" : "hours"}`;
+  return `about ${Math.round(h / 24)} days`;
 }
 
 export function noticeText(s: IndexerStatus): string {
-  const since = s.lastLiveAt ? ` Last live at ${hhmm(s.lastLiveAt)} UTC.` : "";
+  const since = s.lastLiveAt ? ` Last live ${stamp(s.lastLiveAt)}.` : "";
   if (s.state === "down") return `Live data delayed. Bedrock's indexer isn't responding, so the numbers below may be out of date.${since}`;
-  const behind = s.lagMinutes && s.lagMinutes >= 1 ? `about ${s.lagMinutes} min` : "a few minutes";
+  const behind = s.lagMinutes && s.lagMinutes >= 1 ? duration(s.lagMinutes) : "a few minutes";
   return `Live data delayed. Bedrock is catching up with the chain and is ${behind} behind.${since}`;
 }
 
