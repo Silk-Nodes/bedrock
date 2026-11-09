@@ -5,7 +5,8 @@
 
 import { ConsolePage, ConsoleModule } from "@/components/console/Console";
 import { CopyButton } from "@/components/CopyButton";
-import { getRecoveryWatch, RECOVERY_EVM_ADDRESS, RECOVERY_SOURCE } from "@/lib/recovery";
+import { getRecoveryWatch, RECOVERY_EVM_ADDRESS, RECOVERY_SOURCE, type WalletRead } from "@/lib/recovery";
+import { AddressCheck } from "@/components/incidents/AddressCheck";
 import { seo } from "@/lib/seo";
 
 // Rendered per request, never at build: the reads hit 11 public LCDs and a slow
@@ -40,6 +41,11 @@ function AddressParts({ addr }: { addr: string }) {
   );
 }
 
+// "Sent out" cell: plain 0, or the split between returns and everything else.
+const outLabel = (r: WalletRead) =>
+  !r.outbound ? "0" : r.status === "returning" ? `${n(r.outflows?.returnedTx ?? 0)} returned` : r.outflows ? `${n(r.outbound - r.outflows.returnedTx)} elsewhere` : n(r.outbound);
+const outColor = (r: WalletRead) => (!r.outbound ? "var(--ink-60)" : r.status === "returning" ? "var(--moss-text)" : "var(--iron-text)");
+
 export default async function KeplrRecoveryPage() {
   const w = await getRecoveryWatch();
   const { totals, hub } = w;
@@ -48,8 +54,13 @@ export default async function KeplrRecoveryPage() {
   const list = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : xs[0]);
   // Never let a wallet we could not read count as "nothing left": the headline
   // only makes the all-clear claim about wallets actually read this round.
+  const back = totals.returningChains;
+  // Outflows are split: a return goes to an address that had sent into the
+  // wallet; anything else (or anything not yet classified) is the alarm.
   const headline = out.length
-    ? `Funds have left the recovery wallet on ${list(out)}.`
+    ? `Funds have left the recovery wallet on ${list(out)}, to addresses that never sent into it.`
+    : back.length
+      ? `Web3Auth has started returning funds: ${n(totals.returnedTx)} transfer${totals.returnedTx === 1 ? "" : "s"} back to ${n(totals.returnedTo)} affected account${totals.returnedTo === 1 ? "" : "s"}.`
     : unread.length
       ? `Nothing has left the ${totals.tracked - unread.length} recovery wallets we could read.`
       : "Nothing has left Web3Auth's recovery wallets.";
@@ -80,7 +91,12 @@ export default async function KeplrRecoveryPage() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: "12px 40px" }}>
             {[
               { v: n(totals.inbound), l: "transfers in" },
-              { v: n(totals.outbound), l: unread.length ? "sent out, from wallets read" : "sent out", c: out.length ? "var(--iron-text)" : unread.length ? "var(--ink)" : "var(--moss-text)" },
+              ...(back.length || out.length
+                ? [
+                    { v: n(totals.returnedTx), l: "returned to owners", c: "var(--moss-text)" },
+                    { v: n(totals.outbound - totals.returnedTx), l: "sent elsewhere", c: out.length ? "var(--iron-text)" : "var(--ink)" },
+                  ]
+                : [{ v: n(totals.outbound), l: unread.length ? "sent out, from wallets read" : "sent out", c: unread.length ? "var(--ink)" : "var(--moss-text)" }]),
               ...(hubAtom !== null ? [{ v: `${(hubAtom / 1e6).toFixed(2)}M`, l: "ATOM held on the Hub" }] : []),
             ].map((s) => (
               <div key={s.l}>
@@ -113,8 +129,8 @@ export default async function KeplrRecoveryPage() {
                     {r.inbound !== null ? n(r.inbound) : <span style={{ color: "var(--sand)" }}>not read</span>}
                     {r.status === "unconfirmed" && <span style={{ color: "var(--sand)", fontSize: 11 }} data-tip="Only one endpoint answered this round"> *</span>}
                   </td>
-                  <td className="data" style={{ textAlign: "right", fontSize: 13, fontVariantNumeric: "tabular-nums", color: (r.outbound ?? 0) > 0 ? "var(--iron-text)" : "var(--ink-60)" }}>
-                    {r.outbound !== null ? n(r.outbound) : <span style={{ color: "var(--sand)" }}>not read</span>}
+                  <td className="data" style={{ textAlign: "right", fontSize: 13, fontVariantNumeric: "tabular-nums", color: outColor(r) }}>
+                    {r.outbound !== null ? outLabel(r) : <span style={{ color: "var(--sand)" }}>not read</span>}
                   </td>
                 </tr>
               ))}
@@ -123,8 +139,9 @@ export default async function KeplrRecoveryPage() {
          </div>
         </div>
 
-        <div>
+        <AddressCheck />
 
+        <div>
           <details style={{ marginTop: 20, borderTop: "1px solid var(--ink-10)", paddingTop: 14 }}>
             <summary style={{ cursor: "pointer", fontSize: 13.5, color: "var(--ink-80)" }}>The {w.wallets.length + 1} recovery addresses, to check an alert</summary>
             <div style={{ display: "grid", gap: 4, marginTop: 12 }}>
