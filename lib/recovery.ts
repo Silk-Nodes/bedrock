@@ -52,7 +52,9 @@ export const RECOVERY_SOURCE = { label: "Web3Auth on X, Nov 8 2026", url: "https
 export const HUB_RECOVERY_ADDRESS = RECOVERY_WALLETS[0].address;
 
 const REVALIDATE = 600;
-const TIMEOUT_MS = 12_000;
+// The Hub wallet's tx searches are the slowest (24k+ transactions) and timed
+// out at 12s from the VM, so give every read 25s.
+const TIMEOUT_MS = 25_000;
 
 export type HostRead = {
   host: string;
@@ -240,12 +242,16 @@ async function readHubHoldings(): Promise<HubHoldings> {
 export type RecoveryWatch = {
   wallets: WalletRead[];
   hub: HubHoldings;
-  totals: { inbound: number; outbound: number; confirmed: number; tracked: number; outflowChains: string[] };
+  totals: { inbound: number; outbound: number; confirmed: number; tracked: number; outflowChains: string[]; unreadChains: string[] };
   readAt: string;
 };
 
 export async function getRecoveryWatch(): Promise<RecoveryWatch> {
-  const [wallets, hub] = await Promise.all([pool(RECOVERY_WALLETS, 3, readWallet), readHubHoldings()]);
+  // Sequential, not parallel: the Hub balance read pages ~23 requests through
+  // the same endpoints as the Hub tx searches, and running both at once made
+  // all three Hub endpoints time out on Nov 9.
+  const wallets = await pool(RECOVERY_WALLETS, 3, readWallet);
+  const hub = await readHubHoldings();
   return {
     wallets,
     hub,
@@ -255,6 +261,7 @@ export async function getRecoveryWatch(): Promise<RecoveryWatch> {
       confirmed: wallets.filter((w) => w.status === "clear").length,
       tracked: wallets.length,
       outflowChains: wallets.filter((w) => w.status === "outflow").map((w) => w.chain),
+      unreadChains: wallets.filter((w) => w.status === "unreadable").map((w) => w.chain),
     },
     readAt: new Date().toISOString(),
   };

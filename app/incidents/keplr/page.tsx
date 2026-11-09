@@ -44,6 +44,15 @@ export default async function KeplrRecoveryPage() {
   const w = await getRecoveryWatch();
   const { totals, hub } = w;
   const out = totals.outflowChains;
+  const unread = totals.unreadChains;
+  const list = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : xs[0]);
+  // Never let a wallet we could not read count as "nothing left": the headline
+  // only makes the all-clear claim about wallets actually read this round.
+  const headline = out.length
+    ? `Funds have left the recovery wallet on ${list(out)}.`
+    : unread.length
+      ? `Nothing has left the ${totals.tracked - unread.length} recovery wallets we could read.`
+      : "Nothing has left Web3Auth's recovery wallets.";
   const hubAtom = hub ? hub.liquidAtom + hub.lsmAtom : null;
 
   return (
@@ -56,8 +65,13 @@ export default async function KeplrRecoveryPage() {
           <div>
           <p style={{ fontFamily: "var(--font-display)", fontSize: "clamp(28px, 3.4vw, 44px)", lineHeight: 1.12, letterSpacing: "-0.02em", margin: 0,
             color: out.length ? "var(--iron-text)" : "var(--ink)" }}>
-            {out.length ? `Funds have left the recovery wallet on ${out.join(", ")}.` : "Nothing has left Web3Auth's recovery wallets."}
+            {headline}
           </p>
+          {unread.length > 0 && (
+            <p style={{ fontSize: 14, lineHeight: 1.5, color: "var(--sand)", margin: "10px 0 0" }}>
+              {list(unread)} could not be read this round: {unread.length > 1 ? "their" : "its"} endpoints did not answer. The next check is in 10 minutes.
+            </p>
+          )}
           <p style={{ fontSize: 15, lineHeight: 1.55, color: "var(--ink-60)", margin: "12px 0 0" }}>
             Web3Auth moved funds out of exposed Keplr social login accounts into these wallets. We read every one of them on chain.
           </p>
@@ -66,7 +80,7 @@ export default async function KeplrRecoveryPage() {
           <div style={{ display: "flex", flexWrap: "wrap", gap: "12px 40px" }}>
             {[
               { v: n(totals.inbound), l: "transfers in" },
-              { v: n(totals.outbound), l: "sent out", c: out.length ? "var(--iron-text)" : "var(--moss-text)" },
+              { v: n(totals.outbound), l: unread.length ? "sent out, from wallets read" : "sent out", c: out.length ? "var(--iron-text)" : unread.length ? "var(--ink)" : "var(--moss-text)" },
               ...(hubAtom !== null ? [{ v: `${(hubAtom / 1e6).toFixed(2)}M`, l: "ATOM held on the Hub" }] : []),
             ].map((s) => (
               <div key={s.l}>
@@ -96,11 +110,11 @@ export default async function KeplrRecoveryPage() {
                       style={{ color: "var(--ink)", textDecoration: "none", borderBottom: "1px dotted var(--ink-40)" }}>{r.chain}</a>
                   </td>
                   <td className="data" style={{ textAlign: "right", fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
-                    {r.inbound !== null ? n(r.inbound) : "n/a"}
+                    {r.inbound !== null ? n(r.inbound) : <span style={{ color: "var(--sand)" }}>not read</span>}
                     {r.status === "unconfirmed" && <span style={{ color: "var(--sand)", fontSize: 11 }} data-tip="Only one endpoint answered this round"> *</span>}
                   </td>
                   <td className="data" style={{ textAlign: "right", fontSize: 13, fontVariantNumeric: "tabular-nums", color: (r.outbound ?? 0) > 0 ? "var(--iron-text)" : "var(--ink-60)" }}>
-                    {r.outbound !== null ? n(r.outbound) : "n/a"}
+                    {r.outbound !== null ? n(r.outbound) : <span style={{ color: "var(--sand)" }}>not read</span>}
                   </td>
                 </tr>
               ))}
