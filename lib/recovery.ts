@@ -1,3 +1,5 @@
+import { unstable_cache } from "next/cache";
+
 // Web3Auth recovery wallets (Keplr social login incident, Nov 2026), read live
 // from public LCDs on every chain Web3Auth published an address for.
 //
@@ -246,7 +248,7 @@ export type RecoveryWatch = {
   readAt: string;
 };
 
-export async function getRecoveryWatch(): Promise<RecoveryWatch> {
+async function readRecoveryWatch(): Promise<RecoveryWatch> {
   // Sequential, not parallel: the Hub balance read pages ~23 requests through
   // the same endpoints as the Hub tx searches, and running both at once made
   // all three Hub endpoints time out on Nov 9.
@@ -266,3 +268,10 @@ export async function getRecoveryWatch(): Promise<RecoveryWatch> {
     readAt: new Date().toISOString(),
   };
 }
+
+// The whole finished read is cached, not just each LCD response. A cold read
+// takes ~40s and the edge in front of the site cuts requests at 30s, and a
+// failed endpoint call is never cached on its own, so a flaky endpoint made
+// every visitor wait again. With the result cached, visitors get the last
+// complete read at once while the next one runs in the background every 10 min.
+export const getRecoveryWatch = unstable_cache(readRecoveryWatch, ["keplr-recovery-watch-v1"], { revalidate: 600 });
