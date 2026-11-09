@@ -19,6 +19,7 @@ export const metadata = seo({
   description:
     "Is the money Web3Auth recovered from exposed Keplr wallets still there? Its 11 recovery wallets, read on chain every 10 minutes: transfers in, and anything sent out.",
   path: "/incidents/keplr",
+  ogImage: "/card/keplr",
   keywords: ["Keplr", "Web3Auth", "recovery wallets", "Keplr social login", "Cosmos Hub", "ATOM"],
 });
 
@@ -86,6 +87,7 @@ export default async function KeplrRecoveryPage() {
           <p style={{ fontSize: 15, lineHeight: 1.55, color: "var(--ink-60)", margin: "12px 0 0" }}>
             Web3Auth moved funds out of exposed Keplr social login accounts into these wallets. We read every one of them on chain.
           </p>
+          <AddressCheck inline />
 
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "12px 40px" }}>
@@ -108,9 +110,12 @@ export default async function KeplrRecoveryPage() {
 
          </div>
          <div style={{ flex: "1 1 440px", minWidth: 0 }}>
+          {/* 8px rows instead of the site's 10px: the table sets the height of
+              both columns, and at 10px the answer column had an 88px gap. */}
+          <style>{`table.keplr-watch td { padding-top: 8px; padding-bottom: 8px; }`}</style>
           {/* Three short columns fit any phone, so opt out of the mobile
               broadsheet rule that turns tables into horizontal scrollers. */}
-          <table className="broadsheet" style={{ display: "table", width: "100%", whiteSpace: "normal" }}>
+          <table className="broadsheet keplr-watch" style={{ display: "table", width: "100%", whiteSpace: "normal" }}>
             <thead>
               <tr>
                 <th>Wallet</th>
@@ -138,8 +143,6 @@ export default async function KeplrRecoveryPage() {
           </table>
          </div>
         </div>
-
-        <AddressCheck />
 
         <div>
           <details style={{ marginTop: 20, borderTop: "1px solid var(--ink-10)", paddingTop: 14 }}>

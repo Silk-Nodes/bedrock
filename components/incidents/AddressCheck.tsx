@@ -43,7 +43,8 @@ function summary(r: Extract<Result, { ok: true }>): { text: string; tone: string
   return { text: parts.join(" "), tone };
 }
 
-export function AddressCheck() {
+// `inline`: sits in the page's answer column, so no rule or top margin of its own.
+export function AddressCheck({ inline = false }: { inline?: boolean }) {
   const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
@@ -69,8 +70,8 @@ export function AddressCheck() {
   const s = result?.ok ? summary(result) : null;
 
   return (
-    <section style={{ marginTop: 28, paddingTop: 22, borderTop: "1px solid var(--ink-10)" }}>
-      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 400, fontSize: 24, letterSpacing: "-0.01em", margin: 0, color: "var(--ink)" }}>Was my wallet moved?</h2>
+    <section style={inline ? { marginTop: 28 } : { marginTop: 28, paddingTop: 22, borderTop: "1px solid var(--ink-10)" }}>
+      <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 400, fontSize: inline ? 22 : 24, letterSpacing: "-0.01em", margin: 0, color: "var(--ink)" }}>Was my wallet moved?</h2>
       <p style={{ fontSize: 13.5, lineHeight: 1.55, color: "var(--ink-60)", margin: "6px 0 14px", maxWidth: 720 }}>
         Paste your Keplr address. One address covers every chain, because a social login key has the same address on all of them. For Injective, paste your inj1 address.
       </p>
@@ -89,8 +90,12 @@ export function AddressCheck() {
         <button
           type="submit"
           disabled={busy || !address.trim()}
-          style={{ flex: "none", padding: "10px 18px", borderRadius: 4, border: "1px solid var(--ink)", background: "var(--ink)", color: "var(--paper)",
-            fontSize: 13, fontWeight: 600, cursor: busy ? "wait" : "pointer", whiteSpace: "nowrap", opacity: busy || !address.trim() ? 0.6 : 1 }}
+          // Empty field: an outline, not a grey slab. Ready: solid ink.
+          style={{ flex: "none", padding: "10px 18px", borderRadius: 4, fontSize: 13, fontWeight: 600, whiteSpace: "nowrap",
+            border: `1px solid ${address.trim() ? "var(--ink)" : "var(--ink-20)"}`,
+            background: address.trim() ? "var(--ink)" : "transparent",
+            color: address.trim() ? "var(--paper)" : "var(--ink-60)",
+            cursor: busy ? "wait" : address.trim() ? "pointer" : "default", opacity: busy ? 0.7 : 1 }}
         >
           {busy ? "Checking" : "Check"}
         </button>
