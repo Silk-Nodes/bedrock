@@ -16,6 +16,7 @@ import { ValidatorPanel } from "@/components/validator/ValidatorPanel";
 import "./globals.css";
 import { Umami } from "@/components/Umami";
 import { IndexerStatusNotice } from "@/components/IndexerStatusNotice";
+import { IncidentStrip } from "@/components/IncidentStrip";
 
 // Editorial Observatory type set.
 // Newsreader: a clean, modern, high-contrast serif (Teodor-like) for hero
@@ -137,6 +138,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ValidatorPanelProvider>
             <Topbar />
             <IndexerStatusNotice />
+            <IncidentStrip />
             <CommandPalette />
             {/* Page body renders to static HTML. useSearchParams consumers (e.g.
                 a /explore search page) get caught by this boundary per-page; a

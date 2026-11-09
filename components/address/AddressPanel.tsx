@@ -12,6 +12,7 @@ import { ShareButton } from "@/components/share/ShareButton";
 import type { SocialCardProps } from "@/components/share/SocialCard";
 import { WatchStar } from "@/components/WatchStar";
 import { CopyButton } from "@/components/CopyButton";
+import { isRecoveryAddress } from "@/lib/recoveryAddresses";
 
 type Deleg = { validator: string; oper: string; atom: number; pct: number };
 type Unb = { validator: string; oper: string; atom: number; completion: string };
@@ -237,6 +238,20 @@ export function AddressPanel() {
                   <CopyButton text={addr!} label="Copy address" />
                 </div>
               </div>
+
+              {/* People land here checking a scary "attacker" alert: say what this
+                  wallet is before any number, and where the full picture lives. */}
+              {isRecoveryAddress(addr!) && (
+                <a href="/incidents/keplr" style={{ display: "block", marginBottom: 20, padding: "10px 12px", borderRadius: 4, textDecoration: "none",
+                  border: "1px solid color-mix(in srgb, var(--moss) 40%, transparent)", background: "color-mix(in srgb, var(--moss) 8%, var(--paper))",
+                  color: "var(--ink)", fontSize: 13, lineHeight: 1.5 }}>
+                  <strong>Web3Auth recovery wallet.</strong>{" "}
+                  <span style={{ color: "var(--ink-80)" }}>
+                    It holds funds Web3Auth moved out of exposed Keplr social login accounts, published by Web3Auth on Nov 8. Most of the ATOM is held as staking (LSM) shares, which the total below does not include.
+                  </span>{" "}
+                  <span style={{ whiteSpace: "nowrap", borderBottom: "1px solid var(--ink-40)" }}>See the live watch</span>
+                </a>
+              )}
 
               {loading && <div className="data" style={{ fontSize: 12, color: "var(--ink-60)" }}>Reading the chain…</div>}
 
