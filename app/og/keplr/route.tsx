@@ -98,6 +98,12 @@ export async function GET() {
         </div>
       </Scale2x>
     ),
-    { ...OG_DIM, fonts: ogFonts(), headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },
+    {
+      ...OG_DIM,
+      fonts: ogFonts(),
+      // The numbers-free fallback must never be cached: X keeps whatever card
+      // it fetched first for days, and the edge would hand the fallback to it.
+      headers: { "Cache-Control": t ? "public, s-maxage=300, stale-while-revalidate=600" : "no-store" },
+    },
   );
 }
