@@ -37,6 +37,7 @@ const ROUTES: { path: string; priority: number; changeFrequency: MetadataRoute.S
   { path: "/atom/market/relative", priority: 0.6, changeFrequency: "daily" },
   { path: "/signals/cohorts", priority: 0.6, changeFrequency: "daily" },
   { path: "/explore", priority: 0.6, changeFrequency: "weekly" },
+  { path: "/incidents/keplr", priority: 0.7, changeFrequency: "hourly" },
   { path: "/labels", priority: 0.5, changeFrequency: "weekly" },
   { path: "/watchlist", priority: 0.4, changeFrequency: "weekly" },
   { path: "/methodology", priority: 0.7, changeFrequency: "monthly" },
