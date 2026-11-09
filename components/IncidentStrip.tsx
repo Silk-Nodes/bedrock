@@ -17,12 +17,13 @@ const END = Date.UTC(2026, 11, 10, 0, 0); // shown through Dec 9 2026, UTC
 const KEY = "bedrock:strip:keplr-recovery";
 const HREF = "/incidents/keplr";
 
-type Totals = { tracked: number; outflowChains: string[]; unreadChains?: string[] };
-type State = { status: "clear" | "moved" | "partial" | "unknown" };
+type Totals = { tracked: number; outflowChains: string[]; unreadChains?: string[]; returningChains?: string[] };
+type State = { status: "clear" | "returning" | "moved" | "partial" | "unknown" };
 
 function read(t: Totals | null): State {
   if (!t) return { status: "unknown" };
   if (t.outflowChains.length) return { status: "moved" };
+  if ((t.returningChains ?? []).length) return { status: "returning" };
   if ((t.unreadChains ?? []).length) return { status: "partial" };
   return { status: "clear" };
 }
@@ -59,12 +60,13 @@ export function IncidentStrip() {
     }
   };
 
-  // A move out of a recovery wallet is not automatically bad news: returns to
-  // their owners will look exactly like this. So "moved" is neutral, not red.
+  // Returns read as good news; any other move is flagged neutral, not red: the
+  // page itself carries the detail and the alarm.
   const tone = state.status === "moved" ? "var(--sand)" : "var(--moss)";
   const status =
     state.status === "clear" ? " Nothing has left so far."
     : state.status === "partial" ? " Nothing has left the wallets read so far."
+    : state.status === "returning" ? " Web3Auth has started returning funds."
     : state.status === "moved" ? " Funds have moved out of a recovery wallet."
     : "";
 

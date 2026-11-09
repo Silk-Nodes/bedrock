@@ -15,6 +15,7 @@ import { unstable_cache } from "next/cache";
 // public third-party endpoints.
 
 import { RECOVERY_WALLETS, HUB_RECOVERY_ADDRESS, type RecoveryWallet } from "./recoveryAddresses";
+import { classifyOutflows, describeCoins, feeCollectorFor, type TxLike } from "./recoveryCore";
 export { RECOVERY_WALLETS, RECOVERY_EVM_ADDRESS, RECOVERY_SOURCE, HUB_RECOVERY_ADDRESS, type RecoveryWallet } from "./recoveryAddresses";
 
 const REVALIDATE = 600;
@@ -31,7 +32,19 @@ export type HostRead = {
   error?: string;
 };
 
-export type WalletStatus = "clear" | "outflow" | "unconfirmed" | "unreadable";
+// "returning": everything sent out went back to addresses that had sent into
+// the wallet. "outflow": something went to an address that never did, or the
+// outgoing transfers could not be classified (treated as the worse case).
+export type WalletStatus = "clear" | "returning" | "outflow" | "unconfirmed" | "unreadable";
+
+export type Outflows = {
+  returnedTx: number;
+  elsewhereTx: number;
+  returnedTo: number;
+  elsewhereTo: number;
+  returned: string[];     // human amounts returned, e.g. ["1,204 ATOM", "3 other tokens"]
+  classified: number;     // outgoing txs classified (the latest ones, capped)
+};
 
 export type WalletRead = RecoveryWallet & {
   inbound: number | null;
@@ -42,6 +55,7 @@ export type WalletRead = RecoveryWallet & {
   agreeing: number;   // endpoints whose inbound count agrees
   answered: number;   // endpoints that answered at all
   status: WalletStatus;
+  outflows: Outflows | null;
   reads: HostRead[];
 };
 
@@ -51,13 +65,43 @@ async function jget(url: string, revalidate = REVALIDATE): Promise<Record<string
   return (await res.json()) as Record<string, unknown>;
 }
 
-type TxPage = { total?: string; tx_responses?: { timestamp?: string }[] };
+type TxPage = { total?: string; tx_responses?: TxLike[] };
 
-async function txSearch(host: string, query: string, order: "asc" | "desc"): Promise<TxPage> {
+async function txSearch(host: string, query: string, order: "asc" | "desc", limit = 1): Promise<TxPage> {
   // `page` + `limit`, not `pagination.limit`: SDK 0.50 tx search ignores the
   // pagination object and returns 100 full transactions (2 to 4 MB) per call.
-  const q = new URLSearchParams({ query, limit: "1", page: "1", order_by: order === "asc" ? "ORDER_BY_ASC" : "ORDER_BY_DESC" });
+  const q = new URLSearchParams({ query, limit: String(limit), page: "1", order_by: order === "asc" ? "ORDER_BY_ASC" : "ORDER_BY_DESC" });
   return (await jget(`${host}/cosmos/tx/v1beta1/txs?${q}`)) as TxPage;
+}
+
+const OUTFLOW_TX_CAP = 100;   // latest outgoing txs classified per wallet
+const RECIPIENT_CAP = 60;     // distinct recipients checked against the wallet's senders
+
+// Sort the outgoing transfers of a recovery wallet into returns (back to an
+// address that had sent funds in) and everything else.
+async function readOutflows(host: string, w: RecoveryWallet): Promise<Outflows | null> {
+  try {
+    const out = (await txSearch(host, `transfer.sender='${w.address}'`, "desc", OUTFLOW_TX_CAP)).tx_responses ?? [];
+    const fees = feeCollectorFor(w.address);
+    const recipients = new Set<string>();
+    for (const tx of out) for (const ev of tx.events ?? []) {
+      if (ev.type !== "transfer") continue;
+      const a = Object.fromEntries(ev.attributes.map((x) => [x.key, x.value]));
+      if (a.sender === w.address && a.recipient && a.recipient !== w.address && !fees.has(a.recipient)) recipients.add(a.recipient);
+    }
+    const former = new Map<string, boolean>();
+    const list = [...recipients].slice(0, RECIPIENT_CAP);
+    for (const r of list) {
+      const j = await txSearch(host, `transfer.sender='${r}' AND transfer.recipient='${w.address}'`, "asc");
+      former.set(r, Number(j.total ?? 0) > 0);
+    }
+    // A recipient we did not get to check counts as "not a former sender":
+    // an unproven return must never read as one.
+    const { returnedCoins, ...c } = classifyOutflows(out, w.address, (a) => former.get(a) === true, fees);
+    return { ...c, returned: describeCoins(returnedCoins) };
+  } catch {
+    return null;
+  }
 }
 
 async function readHost(host: string, address: string): Promise<HostRead & { firstIn: string | null }> {
@@ -112,14 +156,18 @@ async function readWallet(w: RecoveryWallet): Promise<WalletRead> {
   const firstIn = base ? base.map((r) => r.firstIn).filter(Boolean).sort()[0] ?? null : null;
   const denoms = base ? Math.max(...base.map((r) => r.denoms ?? 0)) : null;
 
+  let outflows: Outflows | null = null;
+  if ((outbound ?? 0) > 0) outflows = await readOutflows((p ?? answered)[0].host, w);
+
   let status: WalletStatus;
   if (!answered.length) status = "unreadable";
-  else if ((outbound ?? 0) > 0) status = "outflow";
-  else if (!p) status = "unconfirmed";
+  else if ((outbound ?? 0) > 0) {
+    status = outflows && outflows.classified > 0 && outflows.elsewhereTx === 0 ? "returning" : "outflow";
+  } else if (!p) status = "unconfirmed";
   else status = "clear";
 
   return {
-    ...w, inbound, outbound, latestIn, firstIn, denoms,
+    ...w, inbound, outbound, latestIn, firstIn, denoms, outflows,
     agreeing: p ? 2 : answered.length ? 1 : 0, answered: answered.length, status,
     reads: reads.map(({ firstIn: _f, ...r }) => r),
   };
@@ -208,7 +256,8 @@ async function readHubHoldings(): Promise<HubHoldings> {
 export type RecoveryWatch = {
   wallets: WalletRead[];
   hub: HubHoldings;
-  totals: { inbound: number; outbound: number; confirmed: number; tracked: number; outflowChains: string[]; unreadChains: string[] };
+  totals: { inbound: number; outbound: number; confirmed: number; tracked: number; outflowChains: string[]; unreadChains: string[];
+    returningChains: string[]; returnedTx: number; returnedTo: number };
   readAt: string;
 };
 
@@ -224,10 +273,13 @@ async function readRecoveryWatch(): Promise<RecoveryWatch> {
     totals: {
       inbound: wallets.reduce((a, w) => a + (w.inbound ?? 0), 0),
       outbound: wallets.reduce((a, w) => a + (w.outbound ?? 0), 0),
-      confirmed: wallets.filter((w) => w.status === "clear").length,
+      confirmed: wallets.filter((w) => w.status === "clear" || w.status === "returning").length,
       tracked: wallets.length,
       outflowChains: wallets.filter((w) => w.status === "outflow").map((w) => w.chain),
       unreadChains: wallets.filter((w) => w.status === "unreadable").map((w) => w.chain),
+      returningChains: wallets.filter((w) => w.status === "returning").map((w) => w.chain),
+      returnedTx: wallets.reduce((a, w) => a + (w.outflows?.returnedTx ?? 0), 0),
+      returnedTo: wallets.reduce((a, w) => a + (w.outflows?.returnedTo ?? 0), 0),
     },
     readAt: new Date().toISOString(),
   };
@@ -238,4 +290,4 @@ async function readRecoveryWatch(): Promise<RecoveryWatch> {
 // failed endpoint call is never cached on its own, so a flaky endpoint made
 // every visitor wait again. With the result cached, visitors get the last
 // complete read at once while the next one runs in the background every 10 min.
-export const getRecoveryWatch = unstable_cache(readRecoveryWatch, ["keplr-recovery-watch-v1"], { revalidate: 600 });
+export const getRecoveryWatch = unstable_cache(readRecoveryWatch, ["keplr-recovery-watch-v2"], { revalidate: 600 });
