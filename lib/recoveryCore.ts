@@ -62,6 +62,22 @@ export function bech32Encode(hrp: string, bytes: number[]): string {
   return hrp + "1" + [...data, ...check].map((d) => CHARSET[d]).join("");
 }
 
+// Chain module accounts are sha256(name)[:20] on every Cosmos SDK chain. They
+// move everyone's funds (the distribution module pays all staking rewards,
+// including the rewards redirected to the recovery wallet), so a module
+// address "checked" like a wallet looks swept on every chain. Say what it is.
+const MODULES: Record<string, string> = {
+  "93354845030274cd4bf1686abd60ab28ec52e1a7": "distribution (it pays out staking rewards)",
+  "4fea76427b8345861e80a3540a8a9d936fd39391": "bonded tokens pool",
+  "5911b844d7bc224654fe0dcd16babd2d253f2fdf": "not bonded tokens pool",
+  "f1829676db577682e944fc3493d451b67ff3e29f": "fee collector",
+  "884d32ce20778b97c4f5a8dbd6f51b43e70bedc9": "fee market fee collector",
+  "7b5fe22b5446f7c62ea27b8bd71cef94e03f3df2": "governance",
+  "dc6f17bbec824fff8f86587966b2047db6ab7367": "mint",
+};
+const hex = (bytes: number[]) => bytes.map((b) => b.toString(16).padStart(2, "0")).join("");
+export const moduleName = (bytes: number[]) => MODULES[hex(bytes)] ?? null;
+
 export type Derived = { ok: true; addresses: Record<string, string>; injectiveOnly: boolean } | { ok: false; error: string };
 
 // One pasted address -> that key's address on each chain prefix.
@@ -69,6 +85,8 @@ export function deriveAddresses(input: string, prefixes: string[]): Derived {
   const d = bech32Decode(input);
   if (!d) return { ok: false, error: "That is not a valid address. Paste the full address, starting with cosmos1, osmo1 or similar." };
   if (d.bytes.length !== 20) return { ok: false, error: "That looks like a contract or module address, not a wallet." };
+  const mod = moduleName(d.bytes);
+  if (mod) return { ok: false, error: `That is a chain module account, the ${mod}, not a wallet. Paste your own address.` };
   if (d.hrp === "inj") return { ok: true, addresses: { inj: bech32Encode("inj", d.bytes) }, injectiveOnly: true };
   const addresses: Record<string, string> = {};
   for (const p of prefixes) if (p !== "inj") addresses[p] = bech32Encode(p, d.bytes);
@@ -89,7 +107,37 @@ export function feeCollectorFor(address: string): Set<string> {
 
 export type Coin = { amount: bigint; denom: string };
 export type Transfer = { sender: string; recipient: string; coins: Coin[] };
-export type TxLike = { txhash?: string; timestamp?: string; events?: { type: string; attributes: { key: string; value: string }[] }[] };
+export type TxLike = {
+  txhash?: string;
+  timestamp?: string;
+  events?: { type: string; attributes: { key: string; value: string }[] }[];
+  tx?: { body?: { memo?: string; messages?: { "@type"?: string }[] } };
+};
+
+// A tx memo and what it resembles. Wallet apps stamp their own name ("Ledger
+// Live", "Stake via Trust Wallet"); Web3Auth's batches use "lsm recovery
+// batch". Only a hint: whoever builds the tx types the memo.
+export type MemoHint = { memo: string; source: "wallet-app" | "recovery" | "other"; app?: string };
+
+const WALLET_APPS: [RegExp, string][] = [
+  [/ledger live/i, "Ledger Live"],
+  [/trust wallet/i, "Trust Wallet"],
+  [/cosmostation/i, "Cosmostation"],
+  [/^keplr\b/i, "Keplr"],
+];
+
+export function memoHint(tx: TxLike): MemoHint | null {
+  const memo = (tx.tx?.body?.memo ?? "").trim();
+  if (!memo) return null;
+  if (/lsm recovery/i.test(memo)) return { memo, source: "recovery" };
+  for (const [re, app] of WALLET_APPS) if (re.test(memo)) return { memo, source: "wallet-app", app };
+  return { memo, source: "other" };
+}
+
+function addHint(list: MemoHint[], tx: TxLike) {
+  const h = memoHint(tx);
+  if (h && !list.some((x) => x.memo === h.memo) && list.length < 3) list.push(h);
+}
 
 export function parseCoins(s: string): Coin[] {
   const out: Coin[] = [];
@@ -132,7 +180,7 @@ export function addCoins(into: Map<string, bigint>, coins: Coin[]) {
 }
 
 export type AddressChainResult = {
-  swept: { count: number; coins: Map<string, bigint>; first: string | null };
+  swept: { count: number; coins: Map<string, bigint>; first: string | null; memos: MemoHint[] };
   elsewhere: { count: number; recipients: string[]; coins: Map<string, bigint> };
   returned: { count: number; coins: Map<string, bigint> };
 };
@@ -143,7 +191,7 @@ export function summarizeAddress(
   signed: TxLike[], returns: TxLike[], addr: string, recovery: string, since: string, feeCollectors: Set<string>,
 ): AddressChainResult {
   const r: AddressChainResult = {
-    swept: { count: 0, coins: new Map(), first: null },
+    swept: { count: 0, coins: new Map(), first: null, memos: [] },
     elsewhere: { count: 0, recipients: [], coins: new Map() },
     returned: { count: 0, coins: new Map() },
   };
@@ -164,6 +212,7 @@ export function summarizeAddress(
     }
     if (toRecovery) {
       r.swept.count++;
+      addHint(r.swept.memos, tx);
       if (!r.swept.first || tx.timestamp < r.swept.first) r.swept.first = tx.timestamp;
     }
     if (toOther) r.elsewhere.count++;
@@ -252,7 +301,7 @@ export type StakingRaw = {
 
 export type StakingSummary = {
   rewardsTo: "recovery" | "self" | "other" | null;
-  unstakes: { count: number; first: string | null; coins: Map<string, bigint> };
+  unstakes: { count: number; first: string | null; coins: Map<string, bigint>; memos: MemoHint[] };
   unbonding: { coins: Map<string, bigint>; completes: string | null };
   staked: Map<string, bigint>;
 };
@@ -262,7 +311,7 @@ type MsgLike = { "@type"?: string; amount?: { denom?: string; amount?: string } 
 export function summarizeStaking(raw: StakingRaw, addr: string, recovery: string, since: string, bondDenom: string): StakingSummary {
   const s: StakingSummary = {
     rewardsTo: raw.withdrawAddress ? (raw.withdrawAddress === recovery ? "recovery" : raw.withdrawAddress === addr ? "self" : "other") : null,
-    unstakes: { count: 0, first: null, coins: new Map() },
+    unstakes: { count: 0, first: null, coins: new Map(), memos: [] },
     unbonding: { coins: new Map(), completes: null },
     staked: new Map(),
   };
@@ -272,6 +321,7 @@ export function summarizeStaking(raw: StakingRaw, addr: string, recovery: string
     for (const m of msgs) {
       if (!m["@type"]?.endsWith("MsgUndelegate") || !m.amount?.amount || !m.amount.denom) continue;
       s.unstakes.count++;
+      addHint(s.unstakes.memos, tx);
       addCoins(s.unstakes.coins, [{ amount: BigInt(m.amount.amount), denom: m.amount.denom }]);
       if (!s.unstakes.first || tx.timestamp < s.unstakes.first) s.unstakes.first = tx.timestamp;
     }

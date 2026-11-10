@@ -5,16 +5,30 @@
 
 import { useState } from "react";
 
+type Memo = { memo: string; source: "wallet-app" | "recovery" | "other"; app?: string };
+
+// What a memo tells the reader. Only ever a hint: whoever builds a tx types
+// its memo, so a wallet name in a memo says how the tx was most likely built,
+// never who signed it. Say what the memo is, never who made the tx.
+function memoText(memos: Memo[]): string {
+  if (!memos.length) return "";
+  const app = memos.find((m) => m.source === "wallet-app");
+  const rec = memos.some((m) => m.source === "recovery");
+  if (app) return ` Memo "${app.memo}", the one ${app.app} adds. Anyone can type a memo, so it is a hint, not proof.`;
+  if (rec) return ` Memo "lsm recovery batch", the one Web3Auth's recovery batches use.`;
+  return ` Memo "${memos[0].memo}".`;
+}
+
 type ChainCheck = {
   chain: string;
   address: string;
   state: "swept" | "returned" | "elsewhere" | "nothing" | "unread";
-  swept: { count: number; first: string | null; amounts: string[] };
+  swept: { count: number; first: string | null; amounts: string[]; memos: Memo[] };
   elsewhere: { count: number; recipients: string[]; amounts: string[] };
   returned: { count: number; amounts: string[] };
   staking: {
     rewardsTo: "recovery" | "self" | "other" | null;
-    unstakes: { count: number; first: string | null; amounts: string[] };
+    unstakes: { count: number; first: string | null; amounts: string[]; memos: Memo[] };
     unbonding: { amounts: string[]; completes: string | null };
     staked: string[];
   } | null;
@@ -41,7 +55,7 @@ function summary(r: Extract<Result, { ok: true }>): { lead: string; notes: Note[
   const notes: Note[] = [];
   let tone = "var(--ink)";
   if (swept.length) {
-    parts.push(`Web3Auth moved funds from this address into its recovery wallet on ${list(swept)}.`);
+    parts.push(`Funds were sent from this address into the Web3Auth recovery wallet on ${list(swept)}.`);
     tone = "var(--moss-text)";
   }
   if (returned.length) parts.push(`Some has come back to you on ${list(returned)}.`);
@@ -148,7 +162,7 @@ export function AddressCheck({ inline = false }: { inline?: boolean }) {
                     <td style={{ fontSize: 13, lineHeight: 1.55, color: "var(--ink-80)" }}>
                       {c.state === "unread" && <span style={{ color: "var(--sand)" }}>Could not be read right now.</span>}
                       {c.swept.count > 0 && (
-                        <div>Moved to the Web3Auth recovery wallet{c.swept.first ? ` on ${day(c.swept.first)}` : ""}: {c.swept.amounts.join(", ") || "tokens"}.</div>
+                        <div>Sent to the Web3Auth recovery wallet{c.swept.first ? ` on ${day(c.swept.first)}` : ""}: {c.swept.amounts.join(", ") || "tokens"}.{memoText(c.swept.memos)}</div>
                       )}
                       {c.returned.count > 0 && (
                         <div style={{ color: "var(--moss-text)" }}>Returned to you: {c.returned.amounts.join(", ") || "tokens"}.</div>
@@ -160,7 +174,7 @@ export function AddressCheck({ inline = false }: { inline?: boolean }) {
                         <div style={{ color: "var(--sand)" }}>Staking rewards go to another address, not this one and not the recovery wallet.</div>
                       )}
                       {c.staking && c.staking.unstakes.count > 0 && (
-                        <div style={{ color: "var(--ink-60)" }}>Unstake started{c.staking.unstakes.first ? ` on ${day(c.staking.unstakes.first)}` : ""}: {c.staking.unstakes.amounts.join(", ")}.</div>
+                        <div style={{ color: "var(--ink-60)" }}>Unstake started{c.staking.unstakes.first ? ` on ${day(c.staking.unstakes.first)}` : ""}: {c.staking.unstakes.amounts.join(", ")}.{memoText(c.staking.unstakes.memos)}</div>
                       )}
                       {c.staking && c.staking.unbonding.amounts.length > 0 && (
                         <div style={{ color: "var(--ink-60)" }}>Unbonding now: {c.staking.unbonding.amounts.join(", ")}{c.staking.unbonding.completes ? `, done on ${day(c.staking.unbonding.completes)}` : ""}.</div>
