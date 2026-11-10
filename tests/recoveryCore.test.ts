@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
-  bech32Decode, bech32Encode, deriveAddresses, feeCollectorFor, FEE_COLLECTOR_BYTES, parseCoins, transfersIn, summarizeAddress, classifyOutflows, describeCoins, type TxLike,
+  summarizeStaking, bech32Decode, bech32Encode, deriveAddresses, feeCollectorFor, FEE_COLLECTOR_BYTES, parseCoins, transfersIn, summarizeAddress, classifyOutflows, describeCoins, type TxLike,
 } from "../lib/recoveryCore.ts";
 
 const HUB_REC = "cosmos1atuap9kfnt6y8ykvn3437e7j3z8qffh3qtnmwu";
@@ -125,4 +125,29 @@ test("a fee named in the tx event is dropped wherever it was paid to", () => {
   const ts = transfersIn(t, new Set());
   assert.equal(ts.length, 1);           // only one 300uosmo was the fee
   assert.equal(ts[0].recipient, HUB_REC);
+});
+
+test("staking: rewards redirected, an unstake, what is still unbonding and staked", () => {
+  const signed: TxLike[] = [
+    { timestamp: "2026-11-10T06:45:00Z", tx: { body: { messages: [{ "@type": "/cosmos.staking.v1beta1.MsgUndelegate", amount: { denom: "uatom", amount: "898000000" } }] } } } as TxLike,
+    { timestamp: "2026-10-01T00:00:00Z", tx: { body: { messages: [{ "@type": "/cosmos.staking.v1beta1.MsgUndelegate", amount: { denom: "uatom", amount: "1" } }] } } } as TxLike, // before Nov 5
+  ];
+  const s = summarizeStaking({
+    signed, withdrawAddress: HUB_REC,
+    unbonding: [{ entries: [{ balance: "898000000", completion_time: "2026-12-01T06:45:00Z" }, { balance: "0", completion_time: "2026-12-02T00:00:00Z" }] }],
+    delegations: [{ balance: { denom: "uatom", amount: "2500000" } }, { balance: { denom: "uatom", amount: "0" } }],
+  }, user, HUB_REC, SINCE, "uatom");
+  assert.equal(s.rewardsTo, "recovery");
+  assert.equal(s.unstakes.count, 1);
+  assert.equal(s.unstakes.first, "2026-11-10T06:45:00Z");
+  assert.deepEqual(describeCoins(s.unbonding.coins), ["898 ATOM"]);
+  assert.equal(s.unbonding.completes, "2026-12-01T06:45:00Z");
+  assert.deepEqual(describeCoins(s.staked), ["2.5 ATOM"]);
+});
+
+test("staking: rewards to self or to a stranger are told apart", () => {
+  const base = { signed: [], unbonding: [], delegations: [] };
+  assert.equal(summarizeStaking({ ...base, withdrawAddress: user }, user, HUB_REC, SINCE, "uatom").rewardsTo, "self");
+  assert.equal(summarizeStaking({ ...base, withdrawAddress: stranger }, user, HUB_REC, SINCE, "uatom").rewardsTo, "other");
+  assert.equal(summarizeStaking({ ...base, withdrawAddress: null }, user, HUB_REC, SINCE, "uatom").rewardsTo, null);
 });

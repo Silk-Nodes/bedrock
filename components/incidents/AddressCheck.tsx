@@ -12,6 +12,12 @@ type ChainCheck = {
   swept: { count: number; first: string | null; amounts: string[] };
   elsewhere: { count: number; recipients: string[]; amounts: string[] };
   returned: { count: number; amounts: string[] };
+  staking: {
+    rewardsTo: "recovery" | "self" | "other" | null;
+    unstakes: { count: number; first: string | null; amounts: string[] };
+    unbonding: { amounts: string[]; completes: string | null };
+    staked: string[];
+  } | null;
 };
 type Result = { ok: true; injectiveOnly: boolean; chains: ChainCheck[]; checkedAt: string } | { ok: false; error: string };
 
@@ -22,12 +28,17 @@ const day = (iso: string | null) => {
 };
 const list = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}` : xs[0] ?? "");
 
-function summary(r: Extract<Result, { ok: true }>): { text: string; tone: string } {
+// The finding gets one line in its colour; caveats ("check that you made
+// them", "not who signed it") are notes in neutral ink, never in the
+// reassuring green of the finding.
+type Note = { text: string; warn?: boolean };
+function summary(r: Extract<Result, { ok: true }>): { lead: string; notes: Note[]; tone: string } {
   const swept = r.chains.filter((c) => c.swept.count > 0).map((c) => c.chain);
   const returned = r.chains.filter((c) => c.returned.count > 0).map((c) => c.chain);
   const elsewhere = r.chains.filter((c) => c.elsewhere.count > 0).map((c) => c.chain);
   const unread = r.chains.filter((c) => c.state === "unread").map((c) => c.chain);
   const parts: string[] = [];
+  const notes: Note[] = [];
   let tone = "var(--ink)";
   if (swept.length) {
     parts.push(`Web3Auth moved funds from this address into its recovery wallet on ${list(swept)}.`);
@@ -35,12 +46,21 @@ function summary(r: Extract<Result, { ok: true }>): { text: string; tone: string
   }
   if (returned.length) parts.push(`Some has come back to you on ${list(returned)}.`);
   if (elsewhere.length) {
-    parts.push(`There were also transfers from this address to other addresses since Nov 5 on ${list(elsewhere)}. Check that you made them.`);
-    if (!swept.length) tone = "var(--sand)";
+    if (swept.length) notes.push({ text: `There were also transfers to other addresses since Nov 5 on ${list(elsewhere)}. Check that you made them.` });
+    else {
+      parts.push(`There were transfers from this address to other addresses since Nov 5 on ${list(elsewhere)}. Check that you made them.`);
+      tone = "var(--sand)";
+    }
+  }
+  const unstaked = r.chains.filter((c) => (c.staking?.unstakes.count ?? 0) > 0).map((c) => c.chain);
+  if (unstaked.length) notes.push({ text: `An unstake was started on ${list(unstaked)} since Nov 5. The chain shows it happened, not who signed it.` });
+  const strangerRewards = r.chains.filter((c) => c.staking?.rewardsTo === "other").map((c) => c.chain);
+  if (strangerRewards.length) {
+    notes.push({ text: `On ${list(strangerRewards)} staking rewards are set to go to an address that is neither yours nor the recovery wallet.`, warn: true });
   }
   if (!parts.length) parts.push(unread.length ? "Nothing has moved from this address since Nov 5 on the chains we could read." : "Nothing has moved from this address since Nov 5 on any chain we checked.");
-  if (unread.length) parts.push(`${list(unread)} could not be read right now, try again in a minute.`);
-  return { text: parts.join(" "), tone };
+  if (unread.length) notes.push({ text: `${list(unread)} could not be read right now, try again in a minute.`, warn: true });
+  return { lead: parts.join(" "), notes, tone };
 }
 
 // `inline`: sits in the page's answer column, so no rule or top margin of its own.
@@ -66,7 +86,11 @@ export function AddressCheck({ inline = false }: { inline?: boolean }) {
     }
   };
 
-  const shown = result?.ok ? result.chains.filter((c) => c.state !== "nothing") : [];
+  // A chain is worth a row if something moved, or its staking changed:
+  // rewards redirected, an unstake, or tokens unbonding right now.
+  const stakingNews = (c: ChainCheck) =>
+    !!c.staking && (c.staking.rewardsTo === "recovery" || c.staking.rewardsTo === "other" || c.staking.unstakes.count > 0 || c.staking.unbonding.amounts.length > 0);
+  const shown = result?.ok ? result.chains.filter((c) => c.state !== "nothing" || stakingNews(c)) : [];
   const s = result?.ok ? summary(result) : null;
 
   return (
@@ -108,7 +132,10 @@ export function AddressCheck({ inline = false }: { inline?: boolean }) {
 
       {result?.ok && s && (
         <div style={{ marginTop: 16, maxWidth: 720 }} aria-live="polite">
-          <p style={{ fontSize: 15, lineHeight: 1.55, color: s.tone, margin: 0 }}>{s.text}</p>
+          <p style={{ fontSize: 15, lineHeight: 1.55, color: s.tone, margin: 0 }}>{s.lead}</p>
+          {s.notes.map((n) => (
+            <p key={n.text} style={{ fontSize: 13.5, lineHeight: 1.55, color: n.warn ? "var(--sand)" : "var(--ink-60)", margin: "6px 0 0" }}>{n.text}</p>
+          ))}
           {shown.length > 0 && (
             <table className="broadsheet" style={{ display: "table", width: "100%", whiteSpace: "normal", marginTop: 14 }}>
               <thead>
@@ -125,6 +152,21 @@ export function AddressCheck({ inline = false }: { inline?: boolean }) {
                       )}
                       {c.returned.count > 0 && (
                         <div style={{ color: "var(--moss-text)" }}>Returned to you: {c.returned.amounts.join(", ") || "tokens"}.</div>
+                      )}
+                      {c.staking?.rewardsTo === "recovery" && (
+                        <div style={{ color: "var(--ink-60)" }}>Staking rewards now go to the Web3Auth recovery wallet.</div>
+                      )}
+                      {c.staking?.rewardsTo === "other" && (
+                        <div style={{ color: "var(--sand)" }}>Staking rewards go to another address, not this one and not the recovery wallet.</div>
+                      )}
+                      {c.staking && c.staking.unstakes.count > 0 && (
+                        <div style={{ color: "var(--ink-60)" }}>Unstake started{c.staking.unstakes.first ? ` on ${day(c.staking.unstakes.first)}` : ""}: {c.staking.unstakes.amounts.join(", ")}.</div>
+                      )}
+                      {c.staking && c.staking.unbonding.amounts.length > 0 && (
+                        <div style={{ color: "var(--ink-60)" }}>Unbonding now: {c.staking.unbonding.amounts.join(", ")}{c.staking.unbonding.completes ? `, done on ${day(c.staking.unbonding.completes)}` : ""}.</div>
+                      )}
+                      {c.staking && c.staking.staked.length > 0 && stakingNews(c) && (
+                        <div style={{ color: "var(--ink-60)" }}>Still staked on this address: {c.staking.staked.join(", ")}.</div>
                       )}
                       {c.elsewhere.count > 0 && (
                         <div style={{ color: "var(--ink-60)" }}>
