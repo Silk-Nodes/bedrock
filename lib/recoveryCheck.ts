@@ -11,7 +11,7 @@
 // held in memory for 5 minutes, keyed by the address bytes, then dropped.
 
 import { RECOVERY_WALLETS } from "./recoveryAddresses";
-import { deriveAddresses, summarizeAddress, summarizeStaking, describeCoins, bech32Decode, feeCollectorFor, type TxLike, type StakingRaw } from "./recoveryCore";
+import { deriveAddresses, summarizeAddress, summarizeStaking, describeCoins, bech32Decode, feeCollectorFor, type TxLike, type StakingRaw, type MemoHint } from "./recoveryCore";
 
 export const INCIDENT_SINCE = "2026-11-05T00:00:00Z";
 const READ_TIMEOUT_MS = 12_000;
@@ -23,13 +23,13 @@ export type ChainCheck = {
   chain: string;
   address: string;
   state: "swept" | "returned" | "elsewhere" | "nothing" | "unread";
-  swept: { count: number; first: string | null; amounts: string[] };
+  swept: { count: number; first: string | null; amounts: string[]; memos: MemoHint[] };
   elsewhere: { count: number; recipients: string[]; amounts: string[] };
   returned: { count: number; amounts: string[] };
   // null when the chain has no staking module or it could not be read
   staking: {
     rewardsTo: "recovery" | "self" | "other" | null;
-    unstakes: { count: number; first: string | null; amounts: string[] };
+    unstakes: { count: number; first: string | null; amounts: string[]; memos: MemoHint[] };
     unbonding: { amounts: string[]; completes: string | null };
     staked: string[];
   } | null;
@@ -80,7 +80,7 @@ async function readStaking(host: string, w: (typeof RECOVERY_WALLETS)[number], a
     const s = summarizeStaking(raw, addr, w.address, INCIDENT_SINCE, bond);
     return {
       rewardsTo: s.rewardsTo,
-      unstakes: { count: s.unstakes.count, first: s.unstakes.first, amounts: describeCoins(s.unstakes.coins) },
+      unstakes: { count: s.unstakes.count, first: s.unstakes.first, amounts: describeCoins(s.unstakes.coins), memos: s.unstakes.memos },
       unbonding: { amounts: describeCoins(s.unbonding.coins), completes: s.unbonding.completes },
       staked: describeCoins(s.staked),
     };
@@ -92,7 +92,7 @@ async function readStaking(host: string, w: (typeof RECOVERY_WALLETS)[number], a
 async function checkChain(w: (typeof RECOVERY_WALLETS)[number], addr: string): Promise<ChainCheck> {
   const empty: ChainCheck = {
     chain: w.chain, address: addr, state: "unread",
-    swept: { count: 0, first: null, amounts: [] }, elsewhere: { count: 0, recipients: [], amounts: [] }, returned: { count: 0, amounts: [] },
+    swept: { count: 0, first: null, amounts: [], memos: [] }, elsewhere: { count: 0, recipients: [], amounts: [] }, returned: { count: 0, amounts: [] },
     staking: null,
   };
   const fees = feeCollectorFor(addr);
@@ -105,7 +105,7 @@ async function checkChain(w: (typeof RECOVERY_WALLETS)[number], addr: string): P
       const state: ChainCheck["state"] = s.returned.count ? "returned" : s.swept.count ? "swept" : s.elsewhere.count ? "elsewhere" : "nothing";
       return {
         chain: w.chain, address: addr, state,
-        swept: { count: s.swept.count, first: s.swept.first, amounts: describeCoins(s.swept.coins) },
+        swept: { count: s.swept.count, first: s.swept.first, amounts: describeCoins(s.swept.coins), memos: s.swept.memos },
         elsewhere: { count: s.elsewhere.count, recipients: s.elsewhere.recipients.slice(0, 3), amounts: describeCoins(s.elsewhere.coins) },
         returned: { count: s.returned.count, amounts: describeCoins(s.returned.coins) },
         staking,
@@ -134,7 +134,7 @@ export async function checkAddress(input: string): Promise<CheckResult> {
     const addr = d.addresses[prefixOf(w.address)];
     const r = await Promise.race([checkChain(w, addr), deadline]);
     return r === "late"
-      ? { chain: w.chain, address: addr, state: "unread" as const, swept: { count: 0, first: null, amounts: [] }, elsewhere: { count: 0, recipients: [], amounts: [] }, returned: { count: 0, amounts: [] }, staking: null }
+      ? { chain: w.chain, address: addr, state: "unread" as const, swept: { count: 0, first: null, amounts: [], memos: [] }, elsewhere: { count: 0, recipients: [], amounts: [] }, returned: { count: 0, amounts: [] }, staking: null }
       : r;
   }));
   const result: CheckResult = { ok: true, injectiveOnly: d.injectiveOnly, chains, checkedAt: new Date().toISOString() };

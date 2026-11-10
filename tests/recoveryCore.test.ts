@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
-  summarizeStaking, bech32Decode, bech32Encode, deriveAddresses, feeCollectorFor, FEE_COLLECTOR_BYTES, parseCoins, transfersIn, summarizeAddress, classifyOutflows, describeCoins, type TxLike,
+  summarizeStaking, memoHint, bech32Decode, bech32Encode, deriveAddresses, feeCollectorFor, FEE_COLLECTOR_BYTES, parseCoins, transfersIn, summarizeAddress, classifyOutflows, describeCoins, type TxLike,
 } from "../lib/recoveryCore.ts";
 
 const HUB_REC = "cosmos1atuap9kfnt6y8ykvn3437e7j3z8qffh3qtnmwu";
@@ -150,4 +150,32 @@ test("staking: rewards to self or to a stranger are told apart", () => {
   assert.equal(summarizeStaking({ ...base, withdrawAddress: user }, user, HUB_REC, SINCE, "uatom").rewardsTo, "self");
   assert.equal(summarizeStaking({ ...base, withdrawAddress: stranger }, user, HUB_REC, SINCE, "uatom").rewardsTo, "other");
   assert.equal(summarizeStaking({ ...base, withdrawAddress: null }, user, HUB_REC, SINCE, "uatom").rewardsTo, null);
+});
+
+test("memos: wallet apps, the recovery batch memo, and everything else", () => {
+  const m = (memo: string) => memoHint({ tx: { body: { memo } } });
+  assert.deepEqual(m("Ledger Live"), { memo: "Ledger Live", source: "wallet-app", app: "Ledger Live" });
+  assert.equal(m("Stake via Trust Wallet")?.app, "Trust Wallet");
+  assert.equal(m("lsm recovery batch")?.source, "recovery");
+  assert.equal(m("gm")?.source, "other");
+  assert.equal(m("   "), null);
+});
+
+test("an unstake keeps its memo, so a Ledger Live unstake reads as the owner's", () => {
+  const signed: TxLike[] = [{ timestamp: "2026-11-10T19:04:00Z", tx: { body: { memo: "Ledger Live", messages: [{ "@type": "/cosmos.staking.v1beta1.MsgUndelegate", amount: { denom: "uatom", amount: "1000000" } } as { "@type": string }] } } }];
+  const s = summarizeStaking({ signed, withdrawAddress: user, unbonding: [], delegations: [] }, user, HUB_REC, SINCE, "uatom");
+  assert.equal(s.unstakes.count, 1);
+  assert.equal(s.unstakes.memos[0].app, "Ledger Live");
+});
+
+test("module accounts are named, not checked like wallets", () => {
+  // The Hub distribution module, which looked "swept" because it pays the
+  // redirected rewards into the recovery wallet.
+  const r = deriveAddresses("cosmos1jv65s3grqf6v6jl3dp4t6c9t9rk99cd88lyufl", ["cosmos"]);
+  assert.equal(r.ok, false);
+  if (!r.ok) assert.match(r.error, /distribution/);
+  for (const name of ["distribution", "bonded_tokens_pool", "fee_collector", "feemarket-fee-collector", "gov", "mint"]) {
+    const bytes = [...createHash("sha256").update(name).digest().subarray(0, 20)];
+    assert.equal(deriveAddresses(bech32Encode("osmo", bytes), ["cosmos"]).ok, false, name);
+  }
 });
