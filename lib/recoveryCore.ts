@@ -236,3 +236,53 @@ export function describeCoins(coins: Map<string, bigint>): string[] {
   if (other) out.push(`${other} other token${other === 1 ? "" : "s"}`);
   return out;
 }
+
+// ── Staking state for the address check ─────────────────────────────────────
+// Since Nov 9 people see reward claims, withdraw-address changes and a few
+// unstakes on swept accounts and cannot tell what they mean. The chain can say
+// what happened, not who signed it (owner, Web3Auth and attacker may share the
+// key), so this reports facts only.
+
+export type StakingRaw = {
+  signed: TxLike[];                                        // txs the address signed (same list as the transfer check)
+  withdrawAddress: string | null;                          // /distribution/.../withdraw_address
+  unbonding: { entries: { balance: string; completion_time: string }[] }[];   // /staking/.../unbonding_delegations
+  delegations: { balance: { denom: string; amount: string } }[];             // /staking/.../delegations
+};
+
+export type StakingSummary = {
+  rewardsTo: "recovery" | "self" | "other" | null;
+  unstakes: { count: number; first: string | null; coins: Map<string, bigint> };
+  unbonding: { coins: Map<string, bigint>; completes: string | null };
+  staked: Map<string, bigint>;
+};
+
+type MsgLike = { "@type"?: string; amount?: { denom?: string; amount?: string } };
+
+export function summarizeStaking(raw: StakingRaw, addr: string, recovery: string, since: string, bondDenom: string): StakingSummary {
+  const s: StakingSummary = {
+    rewardsTo: raw.withdrawAddress ? (raw.withdrawAddress === recovery ? "recovery" : raw.withdrawAddress === addr ? "self" : "other") : null,
+    unstakes: { count: 0, first: null, coins: new Map() },
+    unbonding: { coins: new Map(), completes: null },
+    staked: new Map(),
+  };
+  for (const tx of raw.signed) {
+    if (!tx.timestamp || tx.timestamp < since) continue;
+    const msgs = ((tx as { tx?: { body?: { messages?: MsgLike[] } } }).tx?.body?.messages ?? []);
+    for (const m of msgs) {
+      if (!m["@type"]?.endsWith("MsgUndelegate") || !m.amount?.amount || !m.amount.denom) continue;
+      s.unstakes.count++;
+      addCoins(s.unstakes.coins, [{ amount: BigInt(m.amount.amount), denom: m.amount.denom }]);
+      if (!s.unstakes.first || tx.timestamp < s.unstakes.first) s.unstakes.first = tx.timestamp;
+    }
+  }
+  for (const u of raw.unbonding) for (const e of u.entries) {
+    if (!/^\d+$/.test(e.balance) || e.balance === "0") continue;
+    addCoins(s.unbonding.coins, [{ amount: BigInt(e.balance), denom: bondDenom }]);
+    if (!s.unbonding.completes || e.completion_time > s.unbonding.completes) s.unbonding.completes = e.completion_time;
+  }
+  for (const d of raw.delegations) {
+    if (d.balance?.amount && /^\d+$/.test(d.balance.amount) && d.balance.amount !== "0") addCoins(s.staked, [{ amount: BigInt(d.balance.amount), denom: d.balance.denom }]);
+  }
+  return s;
+}
